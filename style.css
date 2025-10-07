@@ -1,8 +1,19 @@
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
-body.dark-bg {
+html, body {
+    font-family: "JetBrains Mono", monospace;
+}
+
+.dark-bg {
     background: #232834;
     color: #e0e6ed;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: "JetBrains Mono", monospace;
     margin: 0;
     padding: 0;
     min-height: 100vh;
@@ -16,6 +27,7 @@ body.dark-bg {
 .sidebar {
     background: #262b38;
     color: #fff;
+    font-family: "JetBrains Mono", monospace;
     width: 350px;
     min-height: 100vh;
     display: flex;
@@ -71,6 +83,7 @@ body.dark-bg {
 .social {
     display: flex;
     gap: 1.2rem;
+    font-family: "JetBrains Mono", monospace;
     margin-top: 1rem;
     font-size: 1.5rem;
 }
@@ -156,3 +169,5 @@ body.dark-bg {
         padding: 2rem 2vw 1rem 2vw;
     }
 }
+
+
