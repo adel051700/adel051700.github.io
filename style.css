@@ -80,6 +80,15 @@ html, body {
     margin-bottom: 0.5rem;
     color: #b0b8c9;
 }
+.contact-item a {
+    color: #7dd3fc;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+.contact-item a:hover {
+    color: #38bdf8;
+    text-decoration: underline;
+}
 .social {
     display: flex;
     gap: 1.2rem;
@@ -131,6 +140,14 @@ html, body {
     border-radius: 16px;
     font-size: 1rem;
     margin-bottom: 0.3rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+}
+
+.skills-list span:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    background: #3a4152;
 }
 .experience-list {
     display: flex;
