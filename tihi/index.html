@@ -60,6 +60,30 @@
         </div>
     </div>
     
+    <!-- Modal Popup -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <h2>Yay! 💕</h2>
+            <p>Skriv dit navn og e-mail, så jeg ved hvem du er!</p>
+            <form id="valentine-form" action="https://api.web3forms.com/submit" method="POST">
+                <input type="hidden" name="access_key" value="c90457c4-884b-4246-b29c-55c28d005477">
+                <input type="hidden" name="subject" value="Ny valentin! 💕">
+                <input type="hidden" name="from_name" value="Valentin Side">
+                <div class="form-group">
+                    <label for="name">Navn</label>
+                    <input type="text" id="name" name="name" placeholder="Dit navn" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">E-mail</label>
+                    <input type="email" id="email" name="email" placeholder="Din e-mail" required>
+                </div>
+                <button type="submit" class="btn submit-btn">Send 💌</button>
+            </form>
+            <p class="success-message" id="success-msg" style="display: none;">Tak! Jeg har modtaget din besked! 💕</p>
+        </div>
+    </div>
+    
     <audio id="yippee-audio" src="yippee.mp3"></audio>
     
     <script>
@@ -71,11 +95,53 @@
             // Add celebration effect
             document.body.classList.add('celebrate');
             createHearts();
+            
+            // Show modal after a short delay
+            setTimeout(() => {
+                document.getElementById('modal').style.display = 'flex';
+            }, 1000);
         }
         
         function showError() {
-            alert("Fejl: Denne knappen fungerer ikke! \n\nPrøv den anden knappen i stedet...");
+            alert("Fejl: Denne knap fungerer ikke! \n\nPrøv den anden knap i stedet...");
         }
+        
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('modal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+        
+        // Handle form submission
+        document.getElementById('valentine-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            
+            fetch(this.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Accept': 'application/json'
+                }
+            }).then(response => {
+                if (response.ok) {
+                    document.getElementById('valentine-form').style.display = 'none';
+                    document.getElementById('success-msg').style.display = 'block';
+                    createHearts();
+                } else {
+                    alert('Noget gik galt. Prøv igen!');
+                }
+            }).catch(error => {
+                alert('Noget gik galt. Prøv igen!');
+            });
+        });
         
         function createHearts() {
             for (let i = 0; i < 20; i++) {
