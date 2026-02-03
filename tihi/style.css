@@ -225,7 +225,6 @@ body {
     justify-content: center;
     align-items: center;
     z-index: 2000;
-    animation: fadeIn 0.3s ease;
 }
 
 .modal-content {
