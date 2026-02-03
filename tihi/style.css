@@ -1,0 +1,230 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #ffebee 0%, #fce4ec 50%, #f8bbd9 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Dancing Script', cursive;
+    overflow: hidden;
+}
+
+.container {
+    text-align: center;
+    padding: 20px;
+}
+
+.title {
+    font-size: 3.5rem;
+    color: #c2185b;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    animation: fadeInDown 1s ease-out;
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.flowers-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 40px;
+    height: 250px;
+    margin: 30px 0;
+}
+
+.flower {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.stem {
+    width: 8px;
+    height: 0;
+    background: linear-gradient(to top, #2e7d32, #4caf50);
+    border-radius: 4px;
+    animation: growStem 1.5s ease-out forwards;
+}
+
+.flower-1 .stem { animation-delay: 0s; }
+.flower-2 .stem { animation-delay: 0.3s; }
+.flower-3 .stem { animation-delay: 0.6s; }
+
+@keyframes growStem {
+    to {
+        height: 120px;
+    }
+}
+
+.petals {
+    position: absolute;
+    top: -30px;
+    width: 60px;
+    height: 60px;
+    opacity: 0;
+    animation: bloomPetals 1s ease-out forwards;
+}
+
+.flower-1 .petals { animation-delay: 1.5s; }
+.flower-2 .petals { animation-delay: 1.8s; }
+.flower-3 .petals { animation-delay: 2.1s; }
+
+@keyframes bloomPetals {
+    0% {
+        opacity: 0;
+        transform: scale(0);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.petal {
+    position: absolute;
+    width: 25px;
+    height: 35px;
+    border-radius: 50% 50% 50% 50%;
+    left: 50%;
+    top: 50%;
+    transform-origin: center bottom;
+}
+
+.flower-1 .petal { background: linear-gradient(to top, #e91e63, #f48fb1); }
+.flower-2 .petal { background: linear-gradient(to top, #9c27b0, #ce93d8); }
+.flower-3 .petal { background: linear-gradient(to top, #f44336, #ef9a9a); }
+
+.petal:nth-child(1) { transform: translate(-50%, -100%) rotate(0deg); }
+.petal:nth-child(2) { transform: translate(-50%, -100%) rotate(60deg); }
+.petal:nth-child(3) { transform: translate(-50%, -100%) rotate(120deg); }
+.petal:nth-child(4) { transform: translate(-50%, -100%) rotate(180deg); }
+.petal:nth-child(5) { transform: translate(-50%, -100%) rotate(240deg); }
+.petal:nth-child(6) { transform: translate(-50%, -100%) rotate(300deg); }
+
+.center {
+    position: absolute;
+    top: -15px;
+    width: 20px;
+    height: 20px;
+    background: radial-gradient(circle, #ffeb3b, #ffc107);
+    border-radius: 50%;
+    opacity: 0;
+    animation: showCenter 0.5s ease-out forwards;
+    z-index: 10;
+}
+
+.flower-1 .center { animation-delay: 2s; }
+.flower-2 .center { animation-delay: 2.3s; }
+.flower-3 .center { animation-delay: 2.6s; }
+
+@keyframes showCenter {
+    to {
+        opacity: 1;
+    }
+}
+
+.buttons {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin-top: 40px;
+    animation: fadeIn 1s ease-out 2.8s both;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.btn {
+    padding: 15px 40px;
+    font-size: 1.5rem;
+    font-family: 'Dancing Script', cursive;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.yes-btn {
+    background: linear-gradient(135deg, #e91e63, #c2185b);
+    color: white;
+}
+
+.yes-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(233, 30, 99, 0.4);
+}
+
+.no-btn {
+    background: linear-gradient(135deg, #9e9e9e, #757575);
+    color: white;
+}
+
+.no-btn:hover {
+    transform: scale(0.95);
+    opacity: 0.8;
+}
+
+/* Celebration effects */
+.celebrate {
+    animation: celebrate 0.5s ease;
+}
+
+@keyframes celebrate {
+    0%, 100% { background: linear-gradient(135deg, #ffebee 0%, #fce4ec 50%, #f8bbd9 100%); }
+    50% { background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 50%, #f48fb1 100%); }
+}
+
+.floating-heart {
+    position: fixed;
+    bottom: -50px;
+    font-size: 2rem;
+    animation: floatUp 4s ease-out forwards;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+@keyframes floatUp {
+    0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-100vh) rotate(360deg);
+        opacity: 0;
+    }
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .title {
+        font-size: 2rem;
+    }
+    
+    .flowers-container {
+        gap: 20px;
+    }
+    
+    .btn {
+        padding: 12px 25px;
+        font-size: 1.2rem;
+    }
+}

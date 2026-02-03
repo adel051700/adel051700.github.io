@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vil du være min valentin?</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Vil du være min valentin?</h1>
+        
+        <div class="flowers-container">
+            <div class="flower flower-1">
+                <div class="stem"></div>
+                <div class="petals">
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                </div>
+                <div class="center"></div>
+            </div>
+            
+            <div class="flower flower-2">
+                <div class="stem"></div>
+                <div class="petals">
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                </div>
+                <div class="center"></div>
+            </div>
+            
+            <div class="flower flower-3">
+                <div class="stem"></div>
+                <div class="petals">
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                    <div class="petal"></div>
+                </div>
+                <div class="center"></div>
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <button class="btn yes-btn" onclick="playYippee()">Ja! 💕</button>
+            <button class="btn no-btn" onclick="showError()">Nej</button>
+        </div>
+    </div>
+    
+    <audio id="yippee-audio" src="yippee.mp3"></audio>
+    
+    <script>
+        function playYippee() {
+            const audio = document.getElementById('yippee-audio');
+            audio.currentTime = 0;
+            audio.play();
+            
+            // Add celebration effect
+            document.body.classList.add('celebrate');
+            createHearts();
+        }
+        
+        function showError() {
+            alert("Fejl: Denne knappen fungerer ikke! \n\nPrøv den anden knappen i stedet...");
+        }
+        
+        function createHearts() {
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => {
+                    const heart = document.createElement('div');
+                    heart.className = 'floating-heart';
+                    heart.innerHTML = '❤️';
+                    heart.style.left = Math.random() * 100 + 'vw';
+                    heart.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                    document.body.appendChild(heart);
+                    
+                    setTimeout(() => heart.remove(), 4000);
+                }, i * 100);
+            }
+        }
+    </script>
+</body>
+</html>
