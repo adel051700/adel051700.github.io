@@ -73,15 +73,22 @@
             line-height: 1.6;
         }
 
-        #screen-container {
+        #screen_container {
             background: #000;
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 4px 24px rgba(0,0,0,0.4);
         }
 
-        #screen-container canvas {
-            display: block;
+        #screen_container div {
+            white-space: pre;
+            font: 14px 'Courier New', monospace;
+            line-height: 14px;
+            color: #c0c0c0;
+        }
+
+        #screen_container canvas {
+            display: none;
         }
 
         .controls {
@@ -142,10 +149,17 @@
         <p>
             A hobby operating system built from scratch.<br>
             Click <strong>Start</strong> to boot DeanOS in your browser using the
-            <a href="https://github.com/nickvdp/v86" target="_blank">v86</a> x86 emulator.
+            <a href="https://github.com/TheEvalon/x86" target="_blank">v86</a> x86 emulator.
         </p>
 
-        <div id="screen-container"></div>
+        <div id="screen_container">
+            <div style="white-space: pre; font: 14px monospace; line-height: 14px; color: #c0c0c0; padding: 20px;">
+V86 Emulator Ready
+
+Press Start to boot DeanOS.
+            </div>
+            <canvas style="display: none"></canvas>
+        </div>
 
         <div class="controls">
             <button id="start-btn">▶ Start</button>
@@ -159,11 +173,8 @@
         </div>
     </div>
 
-    <!--
-        v86 is loaded from a CDN. To self-host, download the release from
-        https://github.com/nickvdp/v86/releases and place libv86.js + v86.wasm here.
-    -->
-    <script src="https://nickvdp.github.io/v86/build/libv86.js"></script>
+    <!-- v86 from https://github.com/TheEvalon/x86 -->
+    <script src="build/libv86.js"></script>
     <script>
         const startBtn   = document.getElementById("start-btn");
         const restartBtn = document.getElementById("restart-btn");
@@ -171,41 +182,64 @@
         let emulator     = null;
 
         function boot() {
-            status.textContent = "Booting…";
+            status.textContent = "Loading ISO…";
             startBtn.disabled  = true;
 
             if (emulator) {
                 emulator.destroy();
             }
 
-            emulator = new V86({
-                wasm_path:        "https://nickvdp.github.io/v86/build/v86.wasm",
-                memory_size:      64 * 1024 * 1024,   // 64 MB RAM
-                vga_memory_size:  8 * 1024 * 1024,     // 8 MB VRAM
-                screen_container: document.getElementById("screen-container"),
-                bios: {
-                    url: "https://nickvdp.github.io/v86/bios/seabios.bin",
-                },
-                vga_bios: {
-                    url: "https://nickvdp.github.io/v86/bios/vgabios.bin",
-                },
-                cdrom: {
-                    url: "deanos.iso",   // Place your ISO in this folder
-                },
-                autostart: true,
-            });
+            fetch("deanos.iso")
+                .then(function(resp) { return resp.arrayBuffer(); })
+                .then(function(isoBuffer) {
+                    status.textContent = "Booting…";
 
-            emulator.add_listener("emulator-ready", function () {
-                status.textContent    = "Running";
-                restartBtn.disabled   = false;
-            });
+                    emulator = new V86({
+                        wasm_path:        "build/v86.wasm",
+                        memory_size:      64 * 1024 * 1024,
+                        vga_memory_size:  8 * 1024 * 1024,
+                        screen_container: document.getElementById("screen_container"),
+                        bios: {
+                            url: "build/seabios.bin",
+                        },
+                        vga_bios: {
+                            url: "build/vgabios.bin",
+                        },
+                        cdrom: {
+                            buffer: isoBuffer,
+                        },
+                        boot_order: 0x100,
+                        autostart: true,
+                    });
+
+                    emulator.add_listener("emulator-ready", function () {
+                        status.textContent  = "Running";
+                        restartBtn.disabled = false;
+                    });
+
+                    emulator.add_listener("emulator-loaded", function () {
+                        status.textContent  = "Running";
+                        restartBtn.disabled = false;
+                    });
+
+                    setTimeout(function () {
+                        if (status.textContent === "Booting…") {
+                            status.textContent  = "Running";
+                            restartBtn.disabled = false;
+                        }
+                    }, 3000);
+                })
+                .catch(function(err) {
+                    status.textContent = "Error: " + err.message;
+                    startBtn.disabled = false;
+                });
         }
 
         startBtn.addEventListener("click", boot);
         restartBtn.addEventListener("click", function () {
             status.textContent = "Restarting…";
             emulator.restart();
-            status.textContent = "Running";
+            setTimeout(function () { status.textContent = "Running"; }, 1000);
         });
     </script>
 </body>
