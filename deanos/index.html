@@ -125,6 +125,7 @@
             margin-top: 1rem;
             display: flex;
             gap: 1.5rem;
+            align-items: center;
         }
 
         .links a {
@@ -137,6 +138,11 @@
         .links a:hover {
             color: #38bdf8;
             text-decoration: underline;
+        }
+
+        .version-label {
+            color: #b0b8c9;
+            font-size: 0.95rem;
         }
     </style>
 </head>
@@ -170,6 +176,8 @@ Press Start to boot DeanOS.
         <div id="status">Ready</div>
 
         <div class="links">
+            <span id="version-label" class="version-label">Version loading...</span>
+            <a id="download-btn" href="deanos.iso" target="_blank" rel="noopener">Download Latest ISO</a>
             <a href="https://github.com/adel051700/deanos" target="_blank">View Source on GitHub</a>
         </div>
     </div>
@@ -180,7 +188,50 @@ Press Start to boot DeanOS.
         const startBtn   = document.getElementById("start-btn");
         const restartBtn = document.getElementById("restart-btn");
         const status     = document.getElementById("status");
+        const downloadBtn = document.getElementById("download-btn");
+        const versionLabel = document.getElementById("version-label");
+
+        // Public Supabase URL + anon key are safe for frontend use with proper RLS.
+        const SUPABASE_URL = "https://caimogubvdogzubilvfy.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNhaW1vZ3VidmRvZ3p1YmlsdmZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNzkyNDUsImV4cCI6MjA4Mjk1NTI0NX0.eBddkUffZzNeV5cZokDODmKcxHq-j5fmIOfvqje1RFI";
+
+        let currentIsoUrl = "deanos.iso";
         let emulator     = null;
+
+        async function getLatestISO() {
+            try {
+                const res = await fetch(
+                    `${SUPABASE_URL}/rest/v1/os_releases?is_latest=eq.true&select=iso_url,version&limit=1`,
+                    {
+                        headers: {
+                            apikey: SUPABASE_ANON_KEY,
+                            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+                        },
+                    }
+                );
+
+                if (!res.ok) {
+                    throw new Error(`Supabase request failed (${res.status})`);
+                }
+
+                const releases = await res.json();
+                const release = Array.isArray(releases) ? releases[0] : null;
+
+                if (release && release.iso_url) {
+                    currentIsoUrl = release.iso_url;
+                    downloadBtn.href = release.iso_url;
+                    versionLabel.textContent = release.version
+                        ? `Version ${release.version}`
+                        : "Version latest";
+                    return;
+                }
+
+                versionLabel.textContent = "Version unavailable";
+            } catch (err) {
+                console.error("Failed to load latest ISO metadata:", err);
+                versionLabel.textContent = "Version unavailable";
+            }
+        }
 
         function boot() {
             status.textContent = "Loading ISO…";
@@ -191,7 +242,7 @@ Press Start to boot DeanOS.
                 emulator.destroy();
             }
 
-            fetch("deanos.iso")
+            fetch(currentIsoUrl)
                 .then(function(resp) { return resp.arrayBuffer(); })
                 .then(function(isoBuffer) {
                     status.textContent = "Booting…";
@@ -238,6 +289,8 @@ Press Start to boot DeanOS.
                     startBtn.disabled = false;
                 });
         }
+
+            getLatestISO();
 
         startBtn.addEventListener("click", boot);
         restartBtn.addEventListener("click", function () {
