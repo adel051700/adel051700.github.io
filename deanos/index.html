@@ -78,11 +78,12 @@
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+            outline: none;
         }
 
         #screen_container div {
             white-space: pre;
-            font: 14px 'Courier New', monospace;
+            font: 14px 'JetBrains Mono', monospace;
             line-height: 14px;
             color: #c0c0c0;
         }
@@ -152,7 +153,7 @@
             <a href="https://github.com/TheEvalon/x86" target="_blank">v86</a> x86 emulator.
         </p>
 
-        <div id="screen_container">
+        <div id="screen_container" tabindex="0">
             <div style="white-space: pre; font: 14px monospace; line-height: 14px; color: #c0c0c0; padding: 20px;">
 V86 Emulator Ready
 
@@ -184,6 +185,7 @@ Press Start to boot DeanOS.
         function boot() {
             status.textContent = "Loading ISO…";
             startBtn.disabled  = true;
+            startBtn.blur();
 
             if (emulator) {
                 emulator.destroy();
@@ -215,11 +217,13 @@ Press Start to boot DeanOS.
                     emulator.add_listener("emulator-ready", function () {
                         status.textContent  = "Running";
                         restartBtn.disabled = false;
+                        document.getElementById("screen_container").focus();
                     });
 
                     emulator.add_listener("emulator-loaded", function () {
                         status.textContent  = "Running";
                         restartBtn.disabled = false;
+                        document.getElementById("screen_container").focus();
                     });
 
                     setTimeout(function () {
@@ -238,8 +242,12 @@ Press Start to boot DeanOS.
         startBtn.addEventListener("click", boot);
         restartBtn.addEventListener("click", function () {
             status.textContent = "Restarting…";
+            restartBtn.blur();
             emulator.restart();
-            setTimeout(function () { status.textContent = "Running"; }, 1000);
+            setTimeout(function () {
+                status.textContent = "Running";
+                document.getElementById("screen_container").focus();
+            }, 1000);
         });
     </script>
 </body>
