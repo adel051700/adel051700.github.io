@@ -114,14 +114,14 @@ html, body {
     min-width: 0;
 }
 
-.skills-section, .experience-section {
+.skills-section, .experience-section, .projects-section {
     background: #232834;
     border-radius: 10px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     padding: 2rem 2rem 1.5rem 2rem;
     margin-bottom: 2rem;
 }
-.skills-section h2, .experience-section h2 {
+.skills-section h2, .experience-section h2, .projects-section h2 {
     font-size: 1.3rem;
     color: #fff;
     margin-top: 0;
@@ -168,6 +168,37 @@ html, body {
 .exp-date {
     font-size: 0.95rem;
     color: #7a8194;
+}
+
+.experience-item h3 a {
+    color: #7dd3fc;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+.experience-item h3 a:hover {
+    color: #38bdf8;
+    text-decoration: underline;
+}
+
+.project-links {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.8rem;
+}
+.project-btn {
+    display: inline-block;
+    background: #31384a;
+    color: #e0e6ed;
+    padding: 0.45rem 1.1rem;
+    border-radius: 8px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: background 0.2s, transform 0.2s;
+}
+.project-btn:hover {
+    background: #3a4152;
+    transform: translateY(-2px);
 }
 
 @media (max-width: 900px) {

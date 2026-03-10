@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeanOS | Live Demo</title>
+    <link rel="preload"
+      href="../fonts/JetBrainsMono-Regular.woff2"
+      as="font" type="font/woff2" crossorigin>
+    <style>
+        @font-face {
+            font-family: "JetBrains Mono";
+            src: url("../fonts/JetBrainsMono-Regular.woff2") format("woff2");
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #232834;
+            color: #e0e6ed;
+            font-family: "JetBrains Mono", monospace;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            width: 100%;
+            padding: 1.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #262b38;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            color: #fff;
+        }
+
+        header a {
+            color: #7dd3fc;
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+
+        header a:hover {
+            color: #38bdf8;
+            text-decoration: underline;
+        }
+
+        .emulator-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        .emulator-wrapper p {
+            color: #b0b8c9;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        #screen-container {
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+        }
+
+        #screen-container canvas {
+            display: block;
+        }
+
+        .controls {
+            margin-top: 1.5rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .controls button {
+            background: #31384a;
+            color: #e0e6ed;
+            border: none;
+            padding: 0.6rem 1.5rem;
+            border-radius: 8px;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.2s;
+        }
+
+        .controls button:hover {
+            background: #3a4152;
+            transform: translateY(-2px);
+        }
+
+        #status {
+            margin-top: 1rem;
+            color: #7a8194;
+            font-size: 0.9rem;
+        }
+
+        .links {
+            margin-top: 1rem;
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .links a {
+            color: #7dd3fc;
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+
+        .links a:hover {
+            color: #38bdf8;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>DeanOS</h1>
+        <a href="../">&larr; Back to Portfolio</a>
+    </header>
+
+    <div class="emulator-wrapper">
+        <p>
+            A hobby operating system built from scratch.<br>
+            Click <strong>Start</strong> to boot DeanOS in your browser using the
+            <a href="https://github.com/nickvdp/v86" target="_blank">v86</a> x86 emulator.
+        </p>
+
+        <div id="screen-container"></div>
+
+        <div class="controls">
+            <button id="start-btn">▶ Start</button>
+            <button id="restart-btn" disabled>↻ Restart</button>
+        </div>
+
+        <div id="status">Ready</div>
+
+        <div class="links">
+            <a href="https://github.com/adel051700/deanos" target="_blank">View Source on GitHub</a>
+        </div>
+    </div>
+
+    <!--
+        v86 is loaded from a CDN. To self-host, download the release from
+        https://github.com/nickvdp/v86/releases and place libv86.js + v86.wasm here.
+    -->
+    <script src="https://nickvdp.github.io/v86/build/libv86.js"></script>
+    <script>
+        const startBtn   = document.getElementById("start-btn");
+        const restartBtn = document.getElementById("restart-btn");
+        const status     = document.getElementById("status");
+        let emulator     = null;
+
+        function boot() {
+            status.textContent = "Booting…";
+            startBtn.disabled  = true;
+
+            if (emulator) {
+                emulator.destroy();
+            }
+
+            emulator = new V86({
+                wasm_path:        "https://nickvdp.github.io/v86/build/v86.wasm",
+                memory_size:      64 * 1024 * 1024,   // 64 MB RAM
+                vga_memory_size:  8 * 1024 * 1024,     // 8 MB VRAM
+                screen_container: document.getElementById("screen-container"),
+                bios: {
+                    url: "https://nickvdp.github.io/v86/bios/seabios.bin",
+                },
+                vga_bios: {
+                    url: "https://nickvdp.github.io/v86/bios/vgabios.bin",
+                },
+                cdrom: {
+                    url: "deanos.iso",   // Place your ISO in this folder
+                },
+                autostart: true,
+            });
+
+            emulator.add_listener("emulator-ready", function () {
+                status.textContent    = "Running";
+                restartBtn.disabled   = false;
+            });
+        }
+
+        startBtn.addEventListener("click", boot);
+        restartBtn.addEventListener("click", function () {
+            status.textContent = "Restarting…";
+            emulator.restart();
+            status.textContent = "Running";
+        });
+    </script>
+</body>
+</html>
