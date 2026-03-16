@@ -200,15 +200,15 @@ Press Start to boot DeanOS.
 
         async function getLatestISO() {
             try {
-                const res = await fetch(
-                    `${SUPABASE_URL}/rest/v1/os_releases?is_latest=eq.true&select=iso_url,version&limit=1`,
-                    {
-                        headers: {
-                            apikey: SUPABASE_ANON_KEY,
-                            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-                        },
-                    }
-                );
+                const latestReleaseUrl = new URL(`${SUPABASE_URL}/rest/v1/os_releases`);
+                latestReleaseUrl.search = new URLSearchParams({
+                    apikey: SUPABASE_ANON_KEY,
+                    is_latest: "eq.true",
+                    select: "iso_url,version",
+                    limit: "1",
+                }).toString();
+
+                const res = await fetch(latestReleaseUrl.toString());
 
                 if (!res.ok) {
                     throw new Error(`Supabase request failed (${res.status})`);
@@ -291,6 +291,26 @@ Press Start to boot DeanOS.
         }
 
             getLatestISO();
+
+        const screenContainer = document.getElementById("screen_container");
+
+        screenContainer.addEventListener("click", function () {
+            if (emulator) {
+                screenContainer.requestPointerLock();
+            }
+        });
+
+        document.addEventListener("pointerlockchange", function () {
+            if (document.pointerLockElement === screenContainer) {
+                status.textContent = "Running \u2014 mouse captured (press Esc to release)";
+                screenContainer.style.cursor = "none";
+            } else {
+                if (status.textContent.includes("mouse captured")) {
+                    status.textContent = "Running";
+                }
+                screenContainer.style.cursor = "";
+            }
+        });
 
         startBtn.addEventListener("click", boot);
         restartBtn.addEventListener("click", function () {
