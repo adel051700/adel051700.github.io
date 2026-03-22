@@ -196,7 +196,7 @@ Press Start to boot DeanOS.
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNhaW1vZ3VidmRvZ3p1YmlsdmZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNzkyNDUsImV4cCI6MjA4Mjk1NTI0NX0.eBddkUffZzNeV5cZokDODmKcxHq-j5fmIOfvqje1RFI";
 
         let currentIsoUrl = "deanos.iso";
-        const hdaImageUrl = "deanos.img";
+        const hdaCandidates = ["deanos.img", "../deanos.img"];
         let emulator     = null;
 
         async function getLatestISO() {
@@ -234,6 +234,21 @@ Press Start to boot DeanOS.
             }
         }
 
+        async function resolveHdaUrl() {
+            for (const candidate of hdaCandidates) {
+                try {
+                    const res = await fetch(candidate, { method: "HEAD" });
+                    if (res.ok) {
+                        return candidate;
+                    }
+                } catch (err) {
+                    console.warn("Disk probe failed for", candidate, err);
+                }
+            }
+
+            return null;
+        }
+
         function boot() {
             status.textContent = "Loading ISO and disk…";
             startBtn.disabled  = true;
@@ -243,12 +258,16 @@ Press Start to boot DeanOS.
                 emulator.destroy();
             }
 
-            fetch(currentIsoUrl)
-                .then(function(resp) { return resp.arrayBuffer(); })
-                .then(function(isoBuffer) {
+            Promise.all([
+                fetch(currentIsoUrl).then(function(resp) { return resp.arrayBuffer(); }),
+                resolveHdaUrl(),
+            ])
+                .then(function(results) {
+                    const isoBuffer = results[0];
+                    const hdaImageUrl = results[1];
                     status.textContent = "Booting…";
 
-                    emulator = new V86({
+                    const vmConfig = {
                         wasm_path:        "build/v86.wasm",
                         memory_size:      64 * 1024 * 1024,
                         vga_memory_size:  8 * 1024 * 1024,
@@ -262,12 +281,19 @@ Press Start to boot DeanOS.
                         cdrom: {
                             buffer: isoBuffer,
                         },
-                        hda: {
-                            url: hdaImageUrl,
-                        },
                         boot_order: 0x100,
                         autostart: true,
-                    });
+                    };
+
+                    if (hdaImageUrl) {
+                        vmConfig.hda = {
+                            url: hdaImageUrl,
+                        };
+                    } else {
+                        console.warn("No disk image found; booting without HDA.");
+                    }
+
+                    emulator = new V86(vmConfig);
 
                     emulator.add_listener("emulator-ready", function () {
                         status.textContent  = "Running";
