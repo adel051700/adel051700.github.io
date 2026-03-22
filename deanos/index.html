@@ -196,6 +196,7 @@ Press Start to boot DeanOS.
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNhaW1vZ3VidmRvZ3p1YmlsdmZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNzkyNDUsImV4cCI6MjA4Mjk1NTI0NX0.eBddkUffZzNeV5cZokDODmKcxHq-j5fmIOfvqje1RFI";
 
         let currentIsoUrl = "deanos.iso";
+        const hdaImageUrl = "deanos.img";
         let emulator     = null;
 
         async function getLatestISO() {
@@ -234,7 +235,7 @@ Press Start to boot DeanOS.
         }
 
         function boot() {
-            status.textContent = "Loading ISO…";
+            status.textContent = "Loading ISO and disk…";
             startBtn.disabled  = true;
             startBtn.blur();
 
@@ -260,6 +261,9 @@ Press Start to boot DeanOS.
                         },
                         cdrom: {
                             buffer: isoBuffer,
+                        },
+                        hda: {
+                            url: hdaImageUrl,
                         },
                         boot_order: 0x100,
                         autostart: true,
