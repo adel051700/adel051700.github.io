@@ -79,6 +79,10 @@
             overflow: hidden;
             box-shadow: 0 4px 24px rgba(0,0,0,0.4);
             outline: none;
+            display: inline-block;
+            width: fit-content;
+            max-width: 100%;
+            transform: scale(1.1);
         }
 
         #screen_container div {
@@ -89,7 +93,10 @@
         }
 
         #screen_container canvas {
-            display: none;
+            display: block;
+            width: auto !important;
+            height: auto !important;
+            image-rendering: pixelated;
         }
 
         .controls {
