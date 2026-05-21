@@ -1,0 +1,81 @@
+{
+  "name": "Bottle Sort Puzzle",
+  "short_name": "BottleSort",
+  "description": "A relaxing bottle sorting puzzle game - sort colored liquids into bottles",
+  "start_url": "/ordergame/",
+  "scope": "/ordergame/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#667eea",
+  "background_color": "#ffffff",
+  "categories": ["games"],
+  "screenshots": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 720'><rect fill='%23667eea' width='540' height='720'/><text x='270' y='360' font-size='200' fill='white' text-anchor='middle' dominant-baseline='central'>🍔</text></svg>",
+      "sizes": "540x720",
+      "type": "image/svg+xml",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1280 720'><rect fill='%23667eea' width='1280' height='720'/><text x='640' y='360' font-size='200' fill='white' text-anchor='middle' dominant-baseline='central'>🍔</text></svg>",
+      "sizes": "1280x720",
+      "type": "image/svg+xml",
+      "form_factor": "wide"
+    }
+  ],
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23ff6b6b' width='192' height='192'/><text x='96' y='96' font-size='100' fill='white' text-anchor='middle' dominant-baseline='central'>🍔</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect fill='%23ff6b6b' width='512' height='512'/><text x='256' y='256' font-size='300' fill='white' text-anchor='middle' dominant-baseline='central'>🍔</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23667eea' width='192' height='192' rx='45'/><text x='96' y='96' font-size='100' fill='white' text-anchor='middle' dominant-baseline='central'>🍔</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect fill='%23667eea' width='512' height='512' rx='120'/><text x='256' y='256' font-size='300' fill='white' text-anchor='middle' dominant-baseline='central'>🍔</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Play Game",
+      "short_name": "Play",
+      "description": "Start playing Order Crazy",
+      "url": "/ordergame/?shortcut=play",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%234CAF50' width='192' height='192'/><text x='96' y='96' font-size='100' fill='white' text-anchor='middle' dominant-baseline='central'>▶️</text></svg>",
+          "sizes": "192x192",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "View Leaderboard",
+      "short_name": "Leaderboard",
+      "description": "Check the game leaderboard",
+      "url": "/ordergame/?shortcut=leaderboard",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23FF9800' width='192' height='192'/><text x='96' y='96' font-size='100' fill='white' text-anchor='middle' dominant-baseline='central'>🏆</text></svg>",
+          "sizes": "192x192",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ],
+  "prefer_related_applications": false
+}

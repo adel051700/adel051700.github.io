@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="description" content="Bottle Sort Puzzle - A relaxing bottle sorting puzzle game">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23667eea' width='192' height='192'/><text x='50%' y='50%' font-size='100' fill='white' text-anchor='middle' dominant-baseline='central'>🧴</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%23667eea' width='192' height='192'/><text x='50%' y='50%' font-size='100' fill='white' text-anchor='middle' dominant-baseline='central'>🧴</text></svg>">
+    <title>Bottle Sort Puzzle</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <!-- Menu Screen -->
+        <div id="menu-screen" class="screen active">
+            <div class="menu-content">
+                <h1>🧴 Bottle Sort</h1>
+                <p class="subtitle">Sort bottles by color!</p>
+                <button id="play-btn" class="btn-primary">Play Game</button>
+                <button id="leaderboard-btn" class="btn-secondary">Leaderboard</button>
+                <button id="settings-btn" class="btn-secondary">Settings</button>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game-screen" class="screen">
+            <div class="game-header">
+                <div class="score-section">
+                    <div class="stat">
+                        <span class="label">Score</span>
+                        <span id="score-display" class="value">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Level</span>
+                        <span id="level-display" class="value">1</span>
+                    </div>
+                </div>
+                <div class="controls">
+                    <button id="undo-btn" class="btn-small">↶ Undo</button>
+                    <button id="hint-btn" class="btn-small">💡 Hint</button>
+                    <button id="restart-btn" class="btn-small">🔄 Restart</button>
+                </div>
+                <div class="stats-section">
+                    <div class="stat">
+                        <span class="label">Moves</span>
+                        <span id="moves-display" class="value">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">Bottles Sorted</span>
+                        <span id="sorted-display" class="value">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="game-content">
+                <div id="bottles-grid" class="bottles-grid"></div>
+            </div>
+
+            <div class="game-footer">
+                <p id="game-status" class="status">Click a bottle to select, then click another to pour!</p>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameover-screen" class="screen">
+            <div class="gameover-content">
+                <h1>🎉 Puzzle Solved!</h1>
+                <div class="final-stats">
+                    <div class="stat-large">
+                        <span class="label">Final Score</span>
+                        <span id="final-score" class="value">0</span>
+                    </div>
+                    <div class="stat-large">
+                        <span class="label">Moves Used</span>
+                        <span id="final-moves" class="value">0</span>
+                    </div>
+                    <div class="stat-large">
+                        <span class="label">Level Completed</span>
+                        <span id="final-level" class="value">1</span>
+                    </div>
+                </div>
+                <div id="submit-score-section" style="margin: 20px 0;">
+                    <input type="text" id="player-name" placeholder="Enter your name" class="input-field" maxlength="20">
+                    <button id="submit-score-btn" class="btn-primary">Submit Score</button>
+                </div>
+                <button id="next-level-btn" class="btn-primary">Next Level</button>
+                <button id="menu-btn" class="btn-secondary">Main Menu</button>
+            </div>
+        </div>
+
+        <!-- Leaderboard Screen -->
+        <div id="leaderboard-screen" class="screen">
+            <div class="leaderboard-content">
+                <h1>🏆 Leaderboard</h1>
+                <div id="leaderboard-list" class="leaderboard-container">
+                    <p class="loading">Loading leaderboard...</p>
+                </div>
+                <button id="back-btn" class="btn-secondary">Back to Menu</button>
+            </div>
+        </div>
+
+        <!-- Settings Screen -->
+        <div id="settings-screen" class="screen">
+            <div class="settings-content">
+                <h1>⚙️ Settings</h1>
+                <div class="settings-group">
+                    <label class="setting-item">
+                        <span>Sound Effects</span>
+                        <input type="checkbox" id="sound-toggle" checked>
+                    </label>
+                    <label class="setting-item">
+                        <span>Difficulty</span>
+                        <select id="difficulty-select">
+                            <option value="easy">Easy (3 colors, 4 bottles)</option>
+                            <option value="normal" selected>Normal (4 colors, 5 bottles)</option>
+                            <option value="hard">Hard (5 colors, 6 bottles)</option>
+                        </select>
+                    </label>
+                </div>
+                <button id="settings-back-btn" class="btn-secondary">Back to Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script src="supabase-config.js"></script>
+    <script src="game.js"></script>
+    <script>
+        // Register service worker for PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js').catch(err => 
+                console.log('Service Worker registration failed:', err)
+            );
+        }
+    </script>
+</body>
+</html>
