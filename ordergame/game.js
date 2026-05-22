@@ -8,19 +8,20 @@ class BottleSortGame {
         this.moves = 0;
         this.gameActive = false;
         this.bottles = [];
+        // Per-bottle Set of layer positions (0=bottom) that have been revealed.
+        // Sealed bottles start with only the top position visible; each pour
+        // reveals the next layer down.
+        this.revealed = [];
         this.selectedBottle = null;
         this.moveHistory = [];
-        
+
         // Game parameters
         this.bottleCapacity = 4;
         this.colors = [];
-        this.numBottles = 5;
-        this.numColors = 4;
-        
+
         // Settings
         this.soundEnabled = true;
-        this.difficulty = 'normal';
-        
+
         // Color palette
         this.colorPalette = [
             { name: 'red', class: 'color-red' },
@@ -71,106 +72,136 @@ class BottleSortGame {
 
         // Settings
         on('settings-back-btn', 'click', () => this.showMenu());
-        const soundToggle = on('sound-toggle', 'change', (e) => {
+        on('sound-toggle', 'change', (e) => {
             this.soundEnabled = e.target.checked;
             localStorage.setItem('soundEnabled', this.soundEnabled);
         });
-        const difficultySelect = on('difficulty-select', 'change', (e) => {
-            this.difficulty = e.target.value;
-            localStorage.setItem('difficulty', this.difficulty);
-            this.updateDifficultySettings();
-        });
+        on('reset-progress-btn', 'click', () => this.resetProgress());
     }
-    
+
     loadSettings() {
         this.soundEnabled = localStorage.getItem('soundEnabled') !== 'false';
-        this.difficulty = localStorage.getItem('difficulty') || 'normal';
         const soundEl = document.getElementById('sound-toggle');
-        const diffEl = document.getElementById('difficulty-select');
         if (soundEl) soundEl.checked = this.soundEnabled;
-        if (diffEl) diffEl.value = this.difficulty;
     }
-    
-    updateDifficultySettings() {
-        switch (this.difficulty) {
-            case 'easy':
-                this.numColors = 3;
-                this.numBottles = 4;
-                break;
-            case 'normal':
-                this.numColors = 4;
-                this.numBottles = 5;
-                break;
-            case 'hard':
-                this.numColors = 5;
-                this.numBottles = 6;
-                break;
+
+    // Deterministic PRNG (mulberry32) seeded from a level number.
+    makeRng(seed) {
+        let s = seed | 0;
+        return () => {
+            s = (s + 0x6D2B79F5) | 0;
+            let t = s;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    // Difficulty curve: more colors, then locked bottles, as level grows.
+    getLevelConfig(level) {
+        const numColors = Math.min(3 + Math.floor((level - 1) / 3), 8);
+        const numEmpty = 2;
+        const numBottles = numColors + numEmpty;
+        let numLocked = Math.max(0, Math.floor((level - 1) / 5));
+        numLocked = Math.min(numLocked, 3);
+        numLocked = Math.min(numLocked, Math.max(0, numColors - 2));
+        return { numColors, numBottles, numEmpty, numLocked, capacity: this.bottleCapacity };
+    }
+
+    seededShuffle(arr, rng) {
+        const out = [...arr];
+        for (let i = out.length - 1; i > 0; i--) {
+            const j = Math.floor(rng() * (i + 1));
+            [out[i], out[j]] = [out[j], out[i]];
         }
+        return out;
+    }
+
+    resetProgress() {
+        localStorage.removeItem('currentLevel');
+        this.level = 1;
+        this.showToast('Progress reset to level 1', 'success');
+    }
+
+    // A bottle is "sealed" if any of its current layers is still hidden.
+    isBottleSealed(bottleIndex) {
+        const bottle = this.bottles[bottleIndex];
+        const seen = this.revealed[bottleIndex];
+        if (!seen) return false;
+        for (let p = 0; p < bottle.length; p++) {
+            if (!seen.has(p)) return true;
+        }
+        return false;
+    }
+
+    isPositionHidden(bottleIndex, position) {
+        const seen = this.revealed[bottleIndex];
+        return !!seen && !seen.has(position);
     }
     
     startGame() {
-        this.resetGame();
-        this.updateDifficultySettings();
+        const stored = parseInt(localStorage.getItem('currentLevel') || '1', 10);
+        this.level = (isNaN(stored) || stored < 1) ? 1 : stored;
+        this.score = 0;
+        this.moves = 0;
+        this.moveHistory = [];
+        this.selectedBottle = null;
         this.generateLevel();
         this.switchScreen('game-screen');
         this.gameActive = true;
         this.render();
         this.playSound('start');
     }
-    
-    resetGame() {
-        this.score = 0;
-        this.level = 1;
-        this.moves = 0;
-        this.bottles = [];
-        this.selectedBottle = null;
-        this.moveHistory = [];
-    }
-    
+
     generateLevel() {
-        this.bottles = [];
-        this.moveHistory = [];
-        this.moves = 0;
-        
-        // Select colors for this level
-        this.colors = this.colorPalette.slice(0, this.numColors);
-        
-        // Create bottles with mixed colors
+        const config = this.getLevelConfig(this.level);
+        // Seed combines the level with a constant so seeds aren't tiny ints.
+        const rng = this.makeRng(Math.imul(this.level, 2654435761) ^ 0xC0FFEE);
+
+        this.colors = this.colorPalette.slice(0, config.numColors);
+
         let colorArray = [];
-        for (let i = 0; i < this.numColors; i++) {
+        for (let i = 0; i < config.numColors; i++) {
             for (let j = 0; j < this.bottleCapacity; j++) {
                 colorArray.push(i);
             }
         }
-        
-        // Shuffle colors
-        colorArray = this.shuffleArray(colorArray);
-        
-        // Create filled bottles
-        for (let i = 0; i < this.numColors; i++) {
+        colorArray = this.seededShuffle(colorArray, rng);
+
+        this.bottles = [];
+        for (let i = 0; i < config.numColors; i++) {
             const bottle = [];
             for (let j = 0; j < this.bottleCapacity; j++) {
                 bottle.push(colorArray.pop());
             }
             this.bottles.push(bottle);
         }
-        
-        // Add empty bottles
-        for (let i = 0; i < this.numBottles - this.numColors; i++) {
+        for (let i = 0; i < config.numEmpty; i++) {
             this.bottles.push([]);
         }
-        
+
+        // Pick which filled bottles start sealed (deterministic via same rng).
+        const filledIndices = [];
+        for (let i = 0; i < config.numColors; i++) filledIndices.push(i);
+        const lockedSet = new Set(
+            this.seededShuffle(filledIndices, rng).slice(0, config.numLocked)
+        );
+
+        // For sealed bottles, only the top position is initially revealed.
+        // For everything else, every position is revealed.
+        this.revealed = this.bottles.map((bottle, i) => {
+            if (!lockedSet.has(i)) {
+                const all = new Set();
+                for (let p = 0; p < this.bottleCapacity; p++) all.add(p);
+                return all;
+            }
+            return new Set([bottle.length - 1]);
+        });
+
+        this.moves = 0;
+        this.moveHistory = [];
         this.selectedBottle = null;
         this.updateDisplay();
-    }
-    
-    shuffleArray(arr) {
-        const shuffled = [...arr];
-        for (let i = shuffled.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-        }
-        return shuffled;
     }
     
     selectBottle(index) {
@@ -210,15 +241,13 @@ class BottleSortGame {
     pourBottle(fromIndex, toIndex) {
         const fromBottle = this.bottles[fromIndex];
         const toBottle = this.bottles[toIndex];
-        
-        // From bottle must have liquid
+
         if (fromBottle.length === 0) {
             this.selectedBottle = null;
             this.render();
             return;
         }
-        
-        // To bottle must have space
+
         if (toBottle.length >= this.bottleCapacity) {
             this.selectedBottle = null;
             this.render();
@@ -226,62 +255,61 @@ class BottleSortGame {
             this.showToast('Bottle is full!', 'error');
             return;
         }
-        
-        // Colors must match or to bottle must be empty
+
         if (toBottle.length > 0 && toBottle[toBottle.length - 1] !== fromBottle[fromBottle.length - 1]) {
             this.selectedBottle = null;
             this.render();
             this.playSound('error');
-            this.showToast('Colors don\'t match!', 'error');
+            this.showToast("Colors don't match!", 'error');
             return;
         }
-        
-        // Save to history before move
+
         this.moveHistory.push({
             from: fromIndex,
             to: toIndex,
-            bottles: this.bottles.map(b => [...b])
+            bottles: this.bottles.map(b => [...b]),
+            revealed: this.revealed.map(s => [...s])
         });
-        
-        // Pour same color liquids
+
         const color = fromBottle[fromBottle.length - 1];
         const maxPour = this.bottleCapacity - toBottle.length;
-        
+        const seen = this.revealed[fromIndex];
+
+        // Pour matching consecutive layers, but stop the moment we'd uncover
+        // a previously-hidden layer (reveal it, then stop so the player can react).
         let poured = 0;
         while (poured < maxPour && fromBottle.length > 0 && fromBottle[fromBottle.length - 1] === color) {
             toBottle.push(fromBottle.pop());
             poured++;
+            if (fromBottle.length > 0 && !seen.has(fromBottle.length - 1)) {
+                seen.add(fromBottle.length - 1);
+                break;
+            }
         }
-        
+
         this.moves++;
         this.selectedBottle = null;
-        
+
         this.playSound('pour');
         this.render();
-        
-        // Check if puzzle is solved
+
         if (this.checkWin()) {
             this.gameWon();
         }
     }
     
     checkWin() {
-        for (let bottle of this.bottles) {
-            // Empty bottles are okay
+        for (let i = 0; i < this.bottles.length; i++) {
+            const bottle = this.bottles[i];
             if (bottle.length === 0) continue;
-            
-            // Full bottles with single color are okay
+            // Any still-hidden layer means the puzzle isn't fully solved.
+            if (this.isBottleSealed(i)) return false;
             if (bottle.length === this.bottleCapacity) {
                 const firstColor = bottle[0];
-                if (bottle.every(color => color === firstColor)) {
-                    continue;
-                }
+                if (bottle.every(color => color === firstColor)) continue;
             }
-            
-            // Any other state is not solved
             return false;
         }
-        
         return true;
     }
     
@@ -293,8 +321,9 @@ class BottleSortGame {
         
         const lastMove = this.moveHistory.pop();
         this.bottles = lastMove.bottles.map(b => [...b]);
+        if (lastMove.revealed) this.revealed = lastMove.revealed.map(arr => new Set(arr));
         this.moves = Math.max(0, this.moves - 1);
-        
+
         this.selectedBottle = null;
         this.render();
         this.playSound('undo');
@@ -338,7 +367,16 @@ class BottleSortGame {
     
     nextLevel() {
         this.level++;
-        this.startGame();
+        localStorage.setItem('currentLevel', String(this.level));
+        this.score = 0;
+        this.moves = 0;
+        this.moveHistory = [];
+        this.selectedBottle = null;
+        this.generateLevel();
+        this.switchScreen('game-screen');
+        this.gameActive = true;
+        this.render();
+        this.playSound('start');
     }
     
     submitScore() {
@@ -372,15 +410,14 @@ class BottleSortGame {
         if (levelEl) levelEl.textContent = this.level;
         if (movesEl) movesEl.textContent = this.moves;
 
-        // Count sorted bottles
+        // Count sorted bottles (sealed bottles don't count even if their cap matches).
         let sorted = 0;
-        for (let bottle of this.bottles) {
-            if (bottle.length === 0) continue; // Empty is not "sorted"
+        for (let i = 0; i < this.bottles.length; i++) {
+            const bottle = this.bottles[i];
+            if (bottle.length === 0 || this.isBottleSealed(i)) continue;
             if (bottle.length === this.bottleCapacity) {
                 const firstColor = bottle[0];
-                if (bottle.every(color => color === firstColor)) {
-                    sorted++;
-                }
+                if (bottle.every(color => color === firstColor)) sorted++;
             }
         }
 
@@ -392,40 +429,109 @@ class BottleSortGame {
         if (!grid) return;
         grid.innerHTML = '';
         
+        const BODY_FACES = 12;
+        const NECK_FACES = 8;
+
         this.bottles.forEach((bottle, index) => {
             const bottleElement = document.createElement('div');
             bottleElement.className = 'bottle';
-            
+
+            const isSealed = this.isBottleSealed(index);
+
             if (this.selectedBottle === index) {
                 bottleElement.classList.add('selected');
             }
-            
-            // Check if bottle is sorted
-            if (bottle.length === this.bottleCapacity) {
+
+            if (isSealed) {
+                bottleElement.classList.add('locked');
+            } else if (bottle.length === this.bottleCapacity) {
                 const firstColor = bottle[0];
                 if (bottle.every(color => color === firstColor)) {
-                    bottleElement.classList.add('locked');
+                    bottleElement.classList.add('sorted');
                 }
             }
-            
-            // Add layers
-            const layersDiv = document.createElement('div');
-            layersDiv.className = 'bottle-layers';
-            
-            for (let i = 0; i < this.bottleCapacity; i++) {
-                const layer = document.createElement('div');
-                layer.className = 'bottle-layer';
-                
-                if (i < bottle.length) {
-                    layer.classList.add(this.colors[bottle[i]].class);
+
+            // 3D scene
+            const scene = document.createElement('div');
+            scene.className = 'bottle-3d';
+
+            // Body — faceted cylinder. Each face is a vertical panel rotated
+            // around Y; together they approximate a cylinder. Each panel
+            // contains the same vertical liquid stack, brightness-shaded by
+            // its angle from the camera.
+            const body = document.createElement('div');
+            body.className = 'bottle-body';
+            for (let f = 0; f < BODY_FACES; f++) {
+                const angle = f * (360 / BODY_FACES);
+                const face = document.createElement('div');
+                face.className = 'body-face';
+                face.style.transform = `rotateY(${angle}deg) translateZ(var(--body-radius))`;
+                // Cosine shading: front (0°) brightest, sides darker.
+                const shade = 0.45 + 0.55 * Math.cos(angle * Math.PI / 180);
+                face.style.setProperty('--shade', Math.max(0.35, shade).toFixed(3));
+
+                const layers = document.createElement('div');
+                layers.className = 'face-layers';
+                for (let i = 0; i < this.bottleCapacity; i++) {
+                    const layer = document.createElement('div');
+                    layer.className = 'face-layer';
+                    if (i < bottle.length) {
+                        if (this.isPositionHidden(index, i)) {
+                            layer.classList.add('hidden-layer');
+                        } else {
+                            layer.classList.add(this.colors[bottle[i]].class);
+                            if (i === bottle.length - 1) layer.classList.add('top-layer');
+                        }
+                    }
+                    layers.appendChild(layer);
                 }
-                
-                layersDiv.appendChild(layer);
+                face.appendChild(layers);
+                body.appendChild(face);
             }
-            
-            bottleElement.appendChild(layersDiv);
+            scene.appendChild(body);
+
+            // Neck — smaller faceted mini-cylinder sitting on top of the body.
+            // Only when the bottle is completely full does the neck wear the
+            // top color (the liquid has reached the brim). Partially-filled
+            // bottles keep their glass-tinted neck so the empty space remains
+            // visible in the body below.
+            const isFull = bottle.length === this.bottleCapacity;
+            const topIdxForNeck = bottle.length - 1;
+            const neckColorClass = (isFull && !this.isPositionHidden(index, topIdxForNeck))
+                ? this.colors[bottle[topIdxForNeck]].class
+                : null;
+            const neck = document.createElement('div');
+            neck.className = 'bottle-neck';
+            for (let f = 0; f < NECK_FACES; f++) {
+                const angle = f * (360 / NECK_FACES);
+                const face = document.createElement('div');
+                face.className = 'neck-face';
+                if (neckColorClass) face.classList.add(neckColorClass);
+                face.style.transform = `rotateY(${angle}deg) translateZ(var(--neck-radius))`;
+                const shade = 0.5 + 0.5 * Math.cos(angle * Math.PI / 180);
+                face.style.setProperty('--shade', Math.max(0.35, shade).toFixed(3));
+                neck.appendChild(face);
+            }
+            scene.appendChild(neck);
+
+            // Elliptical caps — top opening (dark) and bottom (subtle base).
+            const topCap = document.createElement('div');
+            topCap.className = 'bottle-top-cap';
+            scene.appendChild(topCap);
+
+            const botCap = document.createElement('div');
+            botCap.className = 'bottle-bottom-cap';
+            scene.appendChild(botCap);
+
+            bottleElement.appendChild(scene);
+
+            const check = document.createElement('div');
+            check.className = 'bottle-check';
+            check.textContent = '✓';
+            bottleElement.appendChild(check);
+
             bottleElement.addEventListener('click', () => this.selectBottle(index));
-            
+
             grid.appendChild(bottleElement);
         });
         

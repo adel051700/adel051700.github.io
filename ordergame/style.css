@@ -214,84 +214,318 @@ body {
 .bottles-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: 25px;
+    gap: 25px 35px;
     max-width: 900px;
-    padding: 20px;
+    padding: 40px 20px 60px;
+    position: relative;
+    /* 3D viewing context — each bottle rotates inside this perspective. */
+    perspective: 1600px;
+    perspective-origin: 50% 30%;
 }
 
-/* Bottle Styling - 3D Effect */
+/* Warm floor glow — bottles read as sitting on a lit surface, not floating. */
+.bottles-grid::before {
+    content: '';
+    position: absolute;
+    left: -10%;
+    right: -10%;
+    bottom: -40px;
+    height: 140px;
+    background: radial-gradient(
+        ellipse 55% 100% at 50% 0%,
+        rgba(255, 190, 130, 0.08) 0%,
+        rgba(255, 190, 130, 0.04) 35%,
+        transparent 75%
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Bottle Styling — true 3D faceted cylinder.
+   The body is built from 12 vertical panels arranged around a Y axis, each
+   brightness-shaded by its angle from the camera so the cylinder reads as
+   rounded. A neck (8 panels), a top opening disc, and a bottom base disc
+   complete the geometry. */
+
 .bottle {
-    aspect-ratio: 1;
+    aspect-ratio: 0.62;
     position: relative;
     cursor: pointer;
-    transition: all 0.3s ease;
-    filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.4));
+    /* Use container query units so face translateZ values scale with the
+       bottle's actual rendered width. */
+    container-type: inline-size;
+    perspective: 350cqw;
+    perspective-origin: 50% 30%;
+    /* Apothem (distance from axis to face plane) for each cylinder.
+       Body: radius=44% bottle width, apothem = 44 * cos(15°). */
+    --body-radius: 42.5cqw;
+    --neck-radius: 15.7cqw;
+    transition: transform 0.3s ease, filter 0.3s ease;
+    filter:
+        drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45))
+        drop-shadow(0 18px 22px rgba(0, 0, 0, 0.5));
 }
 
 .bottle:hover {
-    transform: translateY(-8px) scale(1.05);
-    filter: drop-shadow(0 12px 30px rgba(0, 0, 0, 0.6));
+    transform: translateY(-10px) scale(1.04);
+    filter:
+        drop-shadow(0 5px 7px rgba(0, 0, 0, 0.4))
+        drop-shadow(0 26px 32px rgba(0, 0, 0, 0.55));
 }
 
 .bottle.selected {
-    transform: translateY(-10px) scale(1.1);
-    filter: drop-shadow(0 15px 40px rgba(102, 126, 234, 0.8));
+    transform: translateY(-14px) scale(1.08);
+    filter:
+        drop-shadow(0 5px 7px rgba(102, 126, 234, 0.5))
+        drop-shadow(0 30px 38px rgba(102, 126, 234, 0.7));
 }
 
-.bottle.locked::after {
-    content: '✓';
+/* The 3D scene root — viewer is well above the bottle looking down into the
+   opening. Negative rotateX tilts the top of the bottle toward the camera;
+   the larger the magnitude, the steeper the downward view. */
+.bottle-3d {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    transform: rotateX(-30deg);
+    transform-origin: 50% 65%;
+    transition: transform 0.5s ease;
+}
+
+.bottle:hover .bottle-3d {
+    transform: rotateX(-27deg) rotateY(20deg);
+}
+
+.bottle.selected .bottle-3d {
+    transform: rotateX(-27deg) rotateY(-18deg);
+}
+
+/* Body — vertical pivot for the 12 body faces. */
+.bottle-body {
+    position: absolute;
+    left: 50%;
+    top: 14%;
+    bottom: 0;
+    width: 0;
+    transform-style: preserve-3d;
+}
+
+.body-face {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    /* Chord length of one 30° arc on radius 44cqw: 2 * 44 * sin(15°) ≈ 22.8 */
+    width: 23cqw;
+    left: -11.5cqw;
+    backface-visibility: hidden;
+    overflow: hidden;
+    /* Each face dims with cosine of its angle from camera, set inline. */
+    filter: brightness(var(--shade, 1));
+    /* Subtle vertical inner shadows give a sense of cylindrical curve on
+       each panel and help separate adjacent faces. */
+    box-shadow:
+        inset 2px 0 4px rgba(0, 0, 0, 0.15),
+        inset -2px 0 4px rgba(0, 0, 0, 0.15),
+        inset 0 -4px 8px rgba(0, 0, 0, 0.25);
+    /* Round the very bottom corners — the bottle's curved base. */
+    border-bottom-left-radius: 50% 18%;
+    border-bottom-right-radius: 50% 18%;
+}
+
+.face-layers {
+    display: flex;
+    flex-direction: column-reverse;
+    height: 100%;
+    width: 100%;
+}
+
+.face-layer {
+    flex: 1;
+    width: 100%;
+    position: relative;
+    /* Empty space inside the bottle reads as faint glass tint. */
+    background: rgba(255, 255, 255, 0.04);
+    transition: background 0.3s ease;
+}
+
+/* Meniscus — a bright strip at the top of the cap layer. Across the 12 faces
+   it forms a continuous elliptical ring at the liquid surface. */
+.face-layer.top-layer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 7px;
+    background: linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.7) 0%,
+        rgba(255, 255, 255, 0.25) 45%,
+        transparent 100%
+    );
+    pointer-events: none;
+}
+
+/* Hidden layer — striped grey pattern and a ? marker for sealed bottles. */
+.face-layer.hidden-layer {
+    background:
+        repeating-linear-gradient(
+            45deg,
+            #3a3a48 0 6px,
+            #4a4a58 6px 12px
+        );
+}
+
+.face-layer.hidden-layer::after {
+    content: '?';
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 2.5em;
-    color: #4CAF50;
-    background: rgba(255, 255, 255, 0.9);
-    width: 70%;
-    height: 70%;
+    font-size: 0.95em;
+    font-weight: 900;
+    color: rgba(255, 255, 255, 0.7);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.75);
+    pointer-events: none;
+}
+
+/* Neck — small mini-cylinder of 8 faces on top of the body. */
+.bottle-neck {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    height: 14%;
+    width: 0;
+    transform-style: preserve-3d;
+}
+
+.neck-face {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    /* Chord for 45° on radius 17cqw: 2 * 17 * sin(22.5°) ≈ 13.0 */
+    width: 13cqw;
+    left: -6.5cqw;
+    backface-visibility: hidden;
+    background: linear-gradient(
+        to bottom,
+        rgba(210, 225, 240, 0.45) 0%,
+        rgba(180, 200, 220, 0.3) 50%,
+        rgba(150, 170, 195, 0.35) 100%
+    );
+    filter: brightness(var(--shade, 1));
+    box-shadow:
+        inset 0 3px 4px rgba(0, 0, 0, 0.4),
+        inset 0 -1px 2px rgba(255, 255, 255, 0.2);
+}
+
+/* Top opening — a flat horizontal disc at the neck. Rotated 90° around X so
+   it lies horizontal; from the viewer's angle it foreshortens into an
+   ellipse, reading as a dark circular hole. */
+.bottle-top-cap {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 31.4cqw;
+    height: 31.4cqw;
+    margin-left: -15.7cqw;
+    margin-top: -15.7cqw;
+    transform: rotateX(90deg);
+    transform-origin: center;
+    background: radial-gradient(
+        circle at 50% 50%,
+        rgba(6, 8, 16, 0.98) 0%,
+        rgba(20, 24, 36, 0.9) 45%,
+        rgba(45, 55, 75, 0.65) 80%,
+        rgba(90, 105, 130, 0.25) 95%,
+        transparent 100%
+    );
+    border-radius: 50%;
+    z-index: 4;
+}
+
+/* Bottom — closes the bottom of the cylinder so it doesn't read as hollow. */
+.bottle-bottom-cap {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 85cqw;
+    height: 85cqw;
+    margin-left: -42.5cqw;
+    margin-bottom: -42.5cqw;
+    transform: rotateX(90deg);
+    transform-origin: center;
+    background: radial-gradient(
+        circle at 50% 50%,
+        rgba(0, 0, 0, 0.6) 0%,
+        rgba(0, 0, 0, 0.3) 65%,
+        transparent 95%
+    );
+    border-radius: 50%;
+    z-index: 1;
+}
+
+/* Sorted check overlay. Lives outside the .bottle-3d (in 2D over the scene)
+   so it always faces the camera. */
+.bottle-check {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.6);
+    width: 48%;
+    height: 32%;
+    font-size: 2em;
+    color: #2e7d32;
+    background: rgba(255, 255, 255, 0.96);
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    font-weight: bold;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    font-weight: 800;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
-.bottle-layers {
-    display: flex;
-    flex-direction: column-reverse;
-    height: 70%;
-    width: 60%;
-    position: absolute;
-    bottom: 15%;
-    left: 20%;
-    border-radius: 8px;
-    overflow: hidden;
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.1), transparent);
-    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
+.bottle.sorted .bottle-check {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
 }
 
-.bottle-layer {
-    flex: 1;
-    width: 100%;
-    border-bottom: 0.5px solid rgba(255, 255, 255, 0.2);
-    transition: all 0.3s ease;
-    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1);
+/* Locked bottle — dim every face and desaturate so it reads as inert. */
+.bottle.locked .body-face,
+.bottle.locked .neck-face {
+    filter: brightness(calc(var(--shade, 1) * 0.78)) saturate(0.7);
 }
 
-.bottle-layer:last-child {
-    border-bottom: none;
+/* Liquid colors - vertical gradient (lighter near top, darker at depth) */
+.color-red {
+    background: linear-gradient(to bottom, #ff8a8a 0%, #e63946 45%, #a4161a 100%);
+}
+.color-blue {
+    background: linear-gradient(to bottom, #6cb4ee 0%, #2874a6 45%, #0e3f66 100%);
+}
+.color-green {
+    background: linear-gradient(to bottom, #6fd98a 0%, #229954 45%, #145a32 100%);
+}
+.color-yellow {
+    background: linear-gradient(to bottom, #ffec80 0%, #f4a300 45%, #9c5a00 100%);
+}
+.color-purple {
+    background: linear-gradient(to bottom, #c79be3 0%, #884ea0 45%, #4a235a 100%);
+}
+.color-orange {
+    background: linear-gradient(to bottom, #ffc18a 0%, #f5760a 45%, #a23e00 100%);
+}
+.color-pink {
+    background: linear-gradient(to bottom, #f7adc8 0%, #d63384 45%, #851750 100%);
+}
+.color-cyan {
+    background: linear-gradient(to bottom, #82dfd2 0%, #17a589 45%, #0b4f4a 100%);
 }
 
-/* Colors with gradients for depth */
-.color-red { background: linear-gradient(135deg, #ff4757 0%, #ff6348 100%); }
-.color-blue { background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); }
-.color-green { background: linear-gradient(135deg, #4CAF50 0%, #2d6a2d 100%); }
-.color-yellow { background: linear-gradient(135deg, #FFD700 0%, #FFC700 100%); }
-.color-purple { background: linear-gradient(135deg, #9C27B0 0%, #6A0572 100%); }
-.color-orange { background: linear-gradient(135deg, #FF9800 0%, #E65100 100%); }
-.color-pink { background: linear-gradient(135deg, #E91E63 0%, #AD1457 100%); }
-.color-cyan { background: linear-gradient(135deg, #00BCD4 0%, #006064 100%); }
 
 .game-footer {
     background: rgba(0, 0, 0, 0.3);
@@ -482,6 +716,17 @@ body {
 .setting-item select option {
     background: #1a1a3e;
     color: white;
+}
+
+.setting-note {
+    margin-top: 12px;
+    padding: 14px 18px;
+    background: rgba(255, 255, 255, 0.04);
+    border-left: 3px solid rgba(255, 165, 0, 0.7);
+    border-radius: 8px;
+    color: #cbd5e1;
+    font-size: 0.9em;
+    line-height: 1.5;
 }
 
 /* Input Field */
