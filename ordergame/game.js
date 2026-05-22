@@ -575,46 +575,50 @@ class BottleSortGame {
     render() {
         const grid = document.getElementById('bottles-grid');
         if (!grid) return;
+
+        // Building ~700 DOM nodes per call (10 bottles × 12 body faces ×
+        // 4 layers + shoulders/necks/caps) makes every tap janky on iPhone.
+        // Build the bottle DOM once and just toggle classes / shoulder-neck
+        // colors on subsequent renders; rebuild only if the bottle count
+        // changes (level transition).
+        if (!this._bottleEls || this._bottleEls.length !== this.bottles.length) {
+            this._rebuildBottleDom();
+        }
+
+        for (let i = 0; i < this.bottles.length; i++) {
+            this._updateBottle(i);
+        }
+
+        this.updateDisplay();
+    }
+
+    _rebuildBottleDom() {
+        const grid = document.getElementById('bottles-grid');
         grid.innerHTML = '';
-        
+        this._bottleEls = [];
+        this._bottleRefs = [];
+
         const BODY_FACES = 12;
+        const SHOULDER_FACES = 12;
         const NECK_FACES = 8;
 
-        this.bottles.forEach((bottle, index) => {
+        for (let index = 0; index < this.bottles.length; index++) {
             const bottleElement = document.createElement('div');
             bottleElement.className = 'bottle';
 
-            const isSealed = this.isBottleSealed(index);
-
-            if (this.selectedBottle === index) {
-                bottleElement.classList.add('selected');
-            }
-
-            if (isSealed) {
-                bottleElement.classList.add('locked');
-            } else if (bottle.length === this.bottleCapacity) {
-                const firstColor = bottle[0];
-                if (bottle.every(color => color === firstColor)) {
-                    bottleElement.classList.add('sorted');
-                }
-            }
-
-            // 3D scene
             const scene = document.createElement('div');
             scene.className = 'bottle-3d';
 
-            // Body — faceted cylinder. Each face is a vertical panel rotated
-            // around Y; together they approximate a cylinder. Each panel
-            // contains the same vertical liquid stack, brightness-shaded by
-            // its angle from the camera.
             const body = document.createElement('div');
             body.className = 'bottle-body';
+            // refs.layerRefsByPos[pos] is the list of layer divs (one per face)
+            // sitting at vertical position `pos` of this bottle.
+            const layerRefsByPos = Array.from({ length: this.bottleCapacity }, () => []);
             for (let f = 0; f < BODY_FACES; f++) {
                 const angle = f * (360 / BODY_FACES);
                 const face = document.createElement('div');
                 face.className = 'body-face';
                 face.style.transform = `rotateY(${angle}deg) translateZ(var(--body-radius))`;
-                // Cosine shading: front (0°) brightest, sides darker.
                 const shade = 0.45 + 0.55 * Math.cos(angle * Math.PI / 180);
                 face.style.setProperty('--shade', Math.max(0.35, shade).toFixed(3));
 
@@ -623,66 +627,44 @@ class BottleSortGame {
                 for (let i = 0; i < this.bottleCapacity; i++) {
                     const layer = document.createElement('div');
                     layer.className = 'face-layer';
-                    if (i < bottle.length) {
-                        if (this.isPositionHidden(index, i)) {
-                            layer.classList.add('hidden-layer');
-                        } else {
-                            layer.classList.add(this.colors[bottle[i]].class);
-                            if (i === bottle.length - 1) layer.classList.add('top-layer');
-                        }
-                    }
                     layers.appendChild(layer);
+                    layerRefsByPos[i].push(layer);
                 }
                 face.appendChild(layers);
                 body.appendChild(face);
             }
             scene.appendChild(body);
 
-            // Shared coloring for shoulder + neck: only when the body is full
-            // to the brim does the tapered glass above wear the top color,
-            // mirroring liquid that has reached past the body. Partially-filled
-            // bottles keep their glass tint so the empty body remains visible.
-            const isFull = bottle.length === this.bottleCapacity;
-            const topIdx = bottle.length - 1;
-            const topColorClass = (isFull && !this.isPositionHidden(index, topIdx))
-                ? this.colors[bottle[topIdx]].class
-                : null;
-
-            // Shoulder — tapered frustum bridging the body and the neck. Each
-            // face is positioned with its bottom edge on the body cylinder
-            // (translateZ var(--body-radius)) and then leaned inward 50° so its
-            // top edge lands on the neck cylinder.
-            const SHOULDER_FACES = 12;
             const shoulder = document.createElement('div');
             shoulder.className = 'bottle-shoulder';
+            const shoulderFaces = [];
             for (let f = 0; f < SHOULDER_FACES; f++) {
                 const angle = f * (360 / SHOULDER_FACES);
                 const face = document.createElement('div');
                 face.className = 'shoulder-face';
-                if (topColorClass) face.classList.add(topColorClass);
                 face.style.transform = `rotateY(${angle}deg) translateZ(var(--body-radius)) rotateX(50deg)`;
                 const shade = 0.45 + 0.55 * Math.cos(angle * Math.PI / 180);
                 face.style.setProperty('--shade', Math.max(0.35, shade).toFixed(3));
                 shoulder.appendChild(face);
+                shoulderFaces.push(face);
             }
             scene.appendChild(shoulder);
 
-            // Neck — smaller faceted mini-cylinder sitting on top of the body.
             const neck = document.createElement('div');
             neck.className = 'bottle-neck';
+            const neckFaces = [];
             for (let f = 0; f < NECK_FACES; f++) {
                 const angle = f * (360 / NECK_FACES);
                 const face = document.createElement('div');
                 face.className = 'neck-face';
-                if (topColorClass) face.classList.add(topColorClass);
                 face.style.transform = `rotateY(${angle}deg) translateZ(var(--neck-radius))`;
                 const shade = 0.5 + 0.5 * Math.cos(angle * Math.PI / 180);
                 face.style.setProperty('--shade', Math.max(0.35, shade).toFixed(3));
                 neck.appendChild(face);
+                neckFaces.push(face);
             }
             scene.appendChild(neck);
 
-            // Elliptical caps — top opening (dark) and bottom (subtle base).
             const topCap = document.createElement('div');
             topCap.className = 'bottle-top-cap';
             scene.appendChild(topCap);
@@ -701,11 +683,69 @@ class BottleSortGame {
             bottleElement.addEventListener('click', () => this.selectBottle(index));
 
             grid.appendChild(bottleElement);
-        });
-        
-        this.updateDisplay();
+            this._bottleEls.push(bottleElement);
+            this._bottleRefs.push({ layerRefsByPos, shoulderFaces, neckFaces });
+        }
     }
-    
+
+    _updateBottle(index) {
+        const bottle = this.bottles[index];
+        const bottleElement = this._bottleEls[index];
+        const refs = this._bottleRefs[index];
+
+        const isSealed = this.isBottleSealed(index);
+        const isFull = bottle.length === this.bottleCapacity;
+        const isSorted = !isSealed && isFull && bottle.every(c => c === bottle[0]);
+
+        bottleElement.classList.toggle('selected', this.selectedBottle === index);
+        bottleElement.classList.toggle('locked', isSealed);
+        bottleElement.classList.toggle('sorted', isSorted);
+
+        const topIdx = bottle.length - 1;
+        const topColorClass = (isFull && !this.isPositionHidden(index, topIdx))
+            ? this.colors[bottle[topIdx]].class
+            : null;
+
+        // Reusable list of every color class we might have applied previously,
+        // so we can clean stale ones before reapplying the current color.
+        if (!this._allColorClasses) {
+            this._allColorClasses = this.colorPalette.map(c => c.class);
+        }
+        const allColors = this._allColorClasses;
+
+        for (let pos = 0; pos < this.bottleCapacity; pos++) {
+            let colorClass = null;
+            let isHidden = false;
+            let isTop = false;
+            if (pos < bottle.length) {
+                if (this.isPositionHidden(index, pos)) {
+                    isHidden = true;
+                } else {
+                    colorClass = this.colors[bottle[pos]].class;
+                    isTop = (pos === bottle.length - 1);
+                }
+            }
+            for (const layer of refs.layerRefsByPos[pos]) {
+                for (const c of allColors) layer.classList.remove(c);
+                // Animation classes from a previous pour must be cleared too,
+                // otherwise the layer would stay at scaleY(0) or animate again.
+                layer.classList.remove('hidden-layer', 'top-layer', 'draining', 'incoming');
+                if (isHidden) layer.classList.add('hidden-layer');
+                if (colorClass) layer.classList.add(colorClass);
+                if (isTop) layer.classList.add('top-layer');
+            }
+        }
+
+        for (const face of refs.shoulderFaces) {
+            for (const c of allColors) face.classList.remove(c);
+            if (topColorClass) face.classList.add(topColorClass);
+        }
+        for (const face of refs.neckFaces) {
+            for (const c of allColors) face.classList.remove(c);
+            if (topColorClass) face.classList.add(topColorClass);
+        }
+    }
+
     async showLeaderboard() {
         this.switchScreen('leaderboard-screen');
         const container = document.getElementById('leaderboard-list');
