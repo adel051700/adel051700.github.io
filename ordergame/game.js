@@ -14,6 +14,9 @@ class BottleSortGame {
         this.revealed = [];
         this.selectedBottle = null;
         this.moveHistory = [];
+        // True while a pour animation is in flight; blocks input and prevents
+        // overlapping pours from corrupting state.
+        this.animating = false;
 
         // Game parameters
         this.bottleCapacity = 4;
@@ -206,7 +209,8 @@ class BottleSortGame {
     
     selectBottle(index) {
         if (!this.gameActive) return;
-        
+        if (this.animating) return;
+
         const bottle = this.bottles[index];
         
         // If clicked bottle is empty:
@@ -238,7 +242,9 @@ class BottleSortGame {
         this.pourBottle(this.selectedBottle, index);
     }
     
-    pourBottle(fromIndex, toIndex) {
+    async pourBottle(fromIndex, toIndex) {
+        if (this.animating) return;
+
         const fromBottle = this.bottles[fromIndex];
         const toBottle = this.bottles[toIndex];
 
@@ -264,6 +270,37 @@ class BottleSortGame {
             return;
         }
 
+        // Plan the pour without mutating state — we need the count up front to
+        // drive the animation. Mirrors the loop below; stops on the first
+        // would-be-revealed layer.
+        const colorIdx = fromBottle[fromBottle.length - 1];
+        const maxPour = this.bottleCapacity - toBottle.length;
+        const seen = this.revealed[fromIndex];
+        let pourCount = 0;
+        let revealNext = false;
+        {
+            let srcLen = fromBottle.length;
+            while (pourCount < maxPour && srcLen > 0 && fromBottle[srcLen - 1] === colorIdx) {
+                pourCount++;
+                srcLen--;
+                if (srcLen > 0 && !seen.has(srcLen - 1)) {
+                    revealNext = true;
+                    break;
+                }
+            }
+        }
+
+        if (pourCount === 0) {
+            this.selectedBottle = null;
+            this.render();
+            return;
+        }
+
+        this.animating = true;
+        this.selectedBottle = null;
+
+        await this.animatePour(fromIndex, toIndex, pourCount, colorIdx);
+
         this.moveHistory.push({
             from: fromIndex,
             to: toIndex,
@@ -271,31 +308,140 @@ class BottleSortGame {
             revealed: this.revealed.map(s => [...s])
         });
 
-        const color = fromBottle[fromBottle.length - 1];
-        const maxPour = this.bottleCapacity - toBottle.length;
-        const seen = this.revealed[fromIndex];
-
-        // Pour matching consecutive layers, but stop the moment we'd uncover
-        // a previously-hidden layer (reveal it, then stop so the player can react).
-        let poured = 0;
-        while (poured < maxPour && fromBottle.length > 0 && fromBottle[fromBottle.length - 1] === color) {
+        for (let p = 0; p < pourCount; p++) {
             toBottle.push(fromBottle.pop());
-            poured++;
-            if (fromBottle.length > 0 && !seen.has(fromBottle.length - 1)) {
-                seen.add(fromBottle.length - 1);
-                break;
-            }
+        }
+        if (revealNext && fromBottle.length > 0) {
+            seen.add(fromBottle.length - 1);
         }
 
         this.moves++;
-        this.selectedBottle = null;
-
-        this.playSound('pour');
+        this.animating = false;
         this.render();
 
         if (this.checkWin()) {
             this.gameWon();
         }
+    }
+
+    async animatePour(fromIndex, toIndex, pourCount, colorIdx) {
+        const grid = document.getElementById('bottles-grid');
+        if (!grid) return;
+        const bottleEls = grid.querySelectorAll('.bottle');
+        const source = bottleEls[fromIndex];
+        const target = bottleEls[toIndex];
+        if (!source || !target) return;
+
+        // The previously-selected glow on the source would compete with the
+        // pouring transform — strip it before we move.
+        source.classList.remove('selected');
+        grid.classList.add('animating');
+
+        const srcRect = source.getBoundingClientRect();
+        const tgtRect = target.getBoundingClientRect();
+        const gridRect = grid.getBoundingClientRect();
+        const h = srcRect.height;
+
+        // Tilt direction: lean toward the target so the spout overhangs it.
+        const sourceOnLeft = (srcRect.left + srcRect.width / 2) < (tgtRect.left + tgtRect.width / 2);
+        const dir = sourceOnLeft ? 1 : -1;
+        const tiltDeg = dir * 70;
+        const tiltRad = 70 * Math.PI / 180;
+
+        // After a rotation of ±70° around the bottle's bottom-center, the top
+        // of the bottle sits h*sin(70°) ≈ 0.94h to the side and h*(1-cos(70°))
+        // ≈ 0.66h above the base. Position the source so that overhang lands
+        // just above the target's opening.
+        const srcCx = srcRect.left + srcRect.width / 2;
+        const tgtCx = tgtRect.left + tgtRect.width / 2;
+        const dx = (tgtCx - srcCx) - dir * h * Math.sin(tiltRad) * 0.85;
+        const dy = (tgtRect.top - srcRect.top) - h * (1 - Math.cos(tiltRad)) - tgtRect.height * 0.05;
+
+        source.style.transformOrigin = '50% 100%';
+        source.style.transform = `translate(${dx}px, ${dy}px) rotate(${tiltDeg}deg)`;
+        source.style.zIndex = '100';
+        source.classList.add('pouring-source');
+        target.classList.add('pouring-target');
+
+        // Wait for the existing .bottle transform transition (0.3s) to finish.
+        await this.wait(360);
+
+        // Compute the spout and opening positions in grid-local coordinates so
+        // the SVG path can render against the grid's box.
+        const srcRectAfter = source.getBoundingClientRect();
+        const tgtRectAfter = target.getBoundingClientRect();
+        const spoutX = srcRectAfter.left + srcRectAfter.width / 2 + dir * srcRectAfter.width * 0.34 - gridRect.left;
+        const spoutY = srcRectAfter.top + srcRectAfter.height * 0.16 - gridRect.top;
+        const openX = tgtRectAfter.left + tgtRectAfter.width / 2 - gridRect.left;
+        const openY = tgtRectAfter.top + tgtRectAfter.height * 0.1 - gridRect.top;
+
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const overlay = document.createElement('div');
+        overlay.className = 'pour-stream-overlay';
+        const svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('viewBox', `0 0 ${gridRect.width} ${gridRect.height}`);
+        svg.setAttribute('preserveAspectRatio', 'none');
+        const path = document.createElementNS(svgNS, 'path');
+        // Cubic Bezier: control points pull the arc downward like a real stream.
+        const arcDrop = Math.max(30, Math.abs(openX - spoutX) * 0.25);
+        const midY = Math.max(spoutY, openY) + arcDrop;
+        const cp1x = spoutX + dir * 8;
+        const cp1y = spoutY + 18;
+        const cp2x = openX - dir * 8;
+        const cp2y = midY;
+        path.setAttribute('d', `M ${spoutX} ${spoutY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${openX} ${openY}`);
+        path.setAttribute('class', `pour-stream-path ${this.colors[colorIdx].class}`);
+        svg.appendChild(path);
+        overlay.appendChild(svg);
+        overlay.style.zIndex = '150';
+        grid.appendChild(overlay);
+
+        this.playSound('pour');
+
+        // Stagger the layer drain/fill so the liquid appears to move one slot
+        // at a time rather than vanishing/appearing all at once.
+        const fromBottle = this.bottles[fromIndex];
+        const toBottle = this.bottles[toIndex];
+        const sourceFaceLayers = source.querySelectorAll('.body-face .face-layers');
+        const targetFaceLayers = target.querySelectorAll('.body-face .face-layers');
+        const colorClass = this.colors[colorIdx].class;
+        const layerStep = 130;
+
+        for (let i = 0; i < pourCount; i++) {
+            const srcLayerIdx = fromBottle.length - 1 - i;
+            const tgtLayerIdx = toBottle.length + i;
+            setTimeout(() => {
+                sourceFaceLayers.forEach(fl => {
+                    const layer = fl.children[srcLayerIdx];
+                    if (layer) layer.classList.add('draining');
+                });
+                targetFaceLayers.forEach(fl => {
+                    const layer = fl.children[tgtLayerIdx];
+                    if (layer) layer.classList.add('incoming', colorClass);
+                });
+            }, i * layerStep);
+        }
+
+        await this.wait(pourCount * layerStep + 320);
+
+        // Stream fades, then bottle untilts.
+        path.classList.add('fading');
+        await this.wait(180);
+
+        source.style.transform = '';
+        source.classList.remove('pouring-source');
+        target.classList.remove('pouring-target');
+
+        await this.wait(340);
+
+        overlay.remove();
+        source.style.transformOrigin = '';
+        source.style.zIndex = '';
+        grid.classList.remove('animating');
+    }
+
+    wait(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
     
     checkWin() {
@@ -314,6 +460,7 @@ class BottleSortGame {
     }
     
     undo() {
+        if (this.animating) return;
         if (this.moveHistory.length === 0) {
             this.showToast('Nothing to undo!', 'error');
             return;
@@ -337,6 +484,7 @@ class BottleSortGame {
     }
     
     restartLevel() {
+        if (this.animating) return;
         this.generateLevel();
         this.render();
         this.playSound('start');
@@ -490,23 +638,43 @@ class BottleSortGame {
             }
             scene.appendChild(body);
 
-            // Neck — smaller faceted mini-cylinder sitting on top of the body.
-            // Only when the bottle is completely full does the neck wear the
-            // top color (the liquid has reached the brim). Partially-filled
-            // bottles keep their glass-tinted neck so the empty space remains
-            // visible in the body below.
+            // Shared coloring for shoulder + neck: only when the body is full
+            // to the brim does the tapered glass above wear the top color,
+            // mirroring liquid that has reached past the body. Partially-filled
+            // bottles keep their glass tint so the empty body remains visible.
             const isFull = bottle.length === this.bottleCapacity;
-            const topIdxForNeck = bottle.length - 1;
-            const neckColorClass = (isFull && !this.isPositionHidden(index, topIdxForNeck))
-                ? this.colors[bottle[topIdxForNeck]].class
+            const topIdx = bottle.length - 1;
+            const topColorClass = (isFull && !this.isPositionHidden(index, topIdx))
+                ? this.colors[bottle[topIdx]].class
                 : null;
+
+            // Shoulder — tapered frustum bridging the body and the neck. Each
+            // face is positioned with its bottom edge on the body cylinder
+            // (translateZ var(--body-radius)) and then leaned inward 50° so its
+            // top edge lands on the neck cylinder.
+            const SHOULDER_FACES = 12;
+            const shoulder = document.createElement('div');
+            shoulder.className = 'bottle-shoulder';
+            for (let f = 0; f < SHOULDER_FACES; f++) {
+                const angle = f * (360 / SHOULDER_FACES);
+                const face = document.createElement('div');
+                face.className = 'shoulder-face';
+                if (topColorClass) face.classList.add(topColorClass);
+                face.style.transform = `rotateY(${angle}deg) translateZ(var(--body-radius)) rotateX(50deg)`;
+                const shade = 0.45 + 0.55 * Math.cos(angle * Math.PI / 180);
+                face.style.setProperty('--shade', Math.max(0.35, shade).toFixed(3));
+                shoulder.appendChild(face);
+            }
+            scene.appendChild(shoulder);
+
+            // Neck — smaller faceted mini-cylinder sitting on top of the body.
             const neck = document.createElement('div');
             neck.className = 'bottle-neck';
             for (let f = 0; f < NECK_FACES; f++) {
                 const angle = f * (360 / NECK_FACES);
                 const face = document.createElement('div');
                 face.className = 'neck-face';
-                if (neckColorClass) face.classList.add(neckColorClass);
+                if (topColorClass) face.classList.add(topColorClass);
                 face.style.transform = `rotateY(${angle}deg) translateZ(var(--neck-radius))`;
                 const shade = 0.5 + 0.5 * Math.cos(angle * Math.PI / 180);
                 face.style.setProperty('--shade', Math.max(0.35, shade).toFixed(3));

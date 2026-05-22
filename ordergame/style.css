@@ -280,6 +280,24 @@ body {
         drop-shadow(0 30px 38px rgba(102, 126, 234, 0.7));
 }
 
+.bottle.pouring-source,
+.bottle.pouring-target {
+    pointer-events: none;
+}
+
+/* Firefox flattens the 3D scene per-subsection when the bottle parent has
+   `filter` AND a 2D rotate, causing the body/shoulder/neck to drift apart
+   mid-pour. Dropping the filter while pouring keeps the scene fused. */
+.bottle.pouring-source {
+    filter: none;
+}
+
+.bottle.pouring-source .bottle-3d,
+.bottle.pouring-target .bottle-3d {
+    transform: rotateX(-30deg);
+    transition: none;
+}
+
 /* The 3D scene root — viewer is well above the bottle looking down into the
    opening. Negative rotateX tilts the top of the bottle toward the camera;
    the larger the magnitude, the steeper the downward view. */
@@ -304,7 +322,7 @@ body {
 .bottle-body {
     position: absolute;
     left: 50%;
-    top: 14%;
+    top: 22%;
     bottom: 0;
     width: 0;
     transform-style: preserve-3d;
@@ -394,9 +412,47 @@ body {
     position: absolute;
     top: 0;
     left: 50%;
+    height: 8%;
+    width: 0;
+    transform-style: preserve-3d;
+}
+
+/* Shoulder — tapered frustum bridging the wide body and the narrow neck.
+   Each face is a trapezoid (wide at bottom, narrow at top) laid out 35cqw tall,
+   then leaned inward 50° around its bottom edge. After the lean, the top edge
+   of each face sits on the neck cylinder (radius 15.7cqw) and the bottom edge
+   on the body cylinder (radius 42.5cqw), spanning 14% of bottle height. */
+.bottle-shoulder {
+    position: absolute;
+    top: 8%;
+    left: 50%;
     height: 14%;
     width: 0;
     transform-style: preserve-3d;
+}
+
+.shoulder-face {
+    position: absolute;
+    bottom: 0;
+    width: 23cqw;
+    left: -11.5cqw;
+    /* Face's flat (pre-lean) length: sqrt(22.5² + 26.8²) ≈ 35cqw. */
+    height: 35cqw;
+    transform-origin: 50% 100%;
+    /* Top width 8.1cqw / 23cqw ≈ 35% of face width, centered. */
+    clip-path: polygon(32.4% 0%, 67.6% 0%, 100% 100%, 0% 100%);
+    backface-visibility: hidden;
+    background: linear-gradient(
+        to bottom,
+        rgba(210, 225, 240, 0.4) 0%,
+        rgba(180, 200, 220, 0.3) 60%,
+        rgba(160, 180, 205, 0.35) 100%
+    );
+    filter: brightness(var(--shade, 1));
+    box-shadow:
+        inset 2px 0 4px rgba(0, 0, 0, 0.18),
+        inset -2px 0 4px rgba(0, 0, 0, 0.18),
+        inset 0 6px 8px rgba(255, 255, 255, 0.12);
 }
 
 .neck-face {
@@ -494,9 +550,92 @@ body {
     transform: translate(-50%, -50%) scale(1);
 }
 
+/* Pour animation.
+   - `.bottles-grid.animating` blocks input while a pour is in flight.
+   - The source bottle gets an inline transform (translate + rotate) so it
+     leans over the target; transform-origin is set inline to its bottom edge.
+   - The stream SVG is overlaid on the grid and drawn between the tilted spout
+     and the target's opening.
+   - Individual `.face-layer` elements animate scaleY (anchored at their
+     bottom) so liquid appears to drain from the top of source and rise into
+     the bottom of target's empty slots. */
+.bottles-grid.animating {
+    pointer-events: none;
+}
+
+.pour-stream-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: visible;
+    /* Sits above the tilted source (z-index 100, set inline) so the spout
+       connection is visible all the way to the target opening. */
+    z-index: 120;
+}
+
+.pour-stream-overlay svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.pour-stream-path {
+    fill: none;
+    stroke-width: 7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0;
+    animation: streamIn 0.18s ease-out forwards;
+}
+
+@keyframes streamIn {
+    from { opacity: 0; }
+    to   { opacity: 0.95; }
+}
+
+.pour-stream-path.fading {
+    animation: streamOut 0.18s ease-in forwards;
+}
+
+@keyframes streamOut {
+    to { opacity: 0; }
+}
+
+.pour-stream-path.color-red    { stroke: #e63946; filter: drop-shadow(0 0 7px rgba(230, 57, 70, 0.65)); }
+.pour-stream-path.color-blue   { stroke: #2874a6; filter: drop-shadow(0 0 7px rgba(40, 116, 166, 0.65)); }
+.pour-stream-path.color-green  { stroke: #229954; filter: drop-shadow(0 0 7px rgba(34, 153, 84, 0.65)); }
+.pour-stream-path.color-yellow { stroke: #f4a300; filter: drop-shadow(0 0 7px rgba(244, 163, 0, 0.65)); }
+.pour-stream-path.color-purple { stroke: #884ea0; filter: drop-shadow(0 0 7px rgba(136, 78, 160, 0.65)); }
+.pour-stream-path.color-orange { stroke: #f5760a; filter: drop-shadow(0 0 7px rgba(245, 118, 10, 0.65)); }
+.pour-stream-path.color-pink   { stroke: #d63384; filter: drop-shadow(0 0 7px rgba(214, 51, 132, 0.65)); }
+.pour-stream-path.color-cyan   { stroke: #17a589; filter: drop-shadow(0 0 7px rgba(23, 165, 137, 0.65)); }
+
+.face-layer.draining {
+    transform-origin: 50% 100%;
+    animation: layerDrain 0.34s ease-in forwards;
+}
+
+@keyframes layerDrain {
+    from { transform: scaleY(1); }
+    to   { transform: scaleY(0); }
+}
+
+.face-layer.incoming {
+    transform-origin: 50% 100%;
+    animation: layerFill 0.34s ease-out forwards;
+}
+
+@keyframes layerFill {
+    from { transform: scaleY(0); }
+    to   { transform: scaleY(1); }
+}
+
 /* Locked bottle — dim every face and desaturate so it reads as inert. */
 .bottle.locked .body-face,
-.bottle.locked .neck-face {
+.bottle.locked .neck-face,
+.bottle.locked .shoulder-face {
     filter: brightness(calc(var(--shade, 1) * 0.78)) saturate(0.7);
 }
 
