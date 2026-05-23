@@ -241,26 +241,19 @@ body {
     z-index: 0;
 }
 
-/* Bottle Styling — true 3D faceted cylinder.
-   The body is built from 12 vertical panels arranged around a Y axis, each
-   brightness-shaded by its angle from the camera so the cylinder reads as
-   rounded. A neck (8 panels), a top opening disc, and a bottom base disc
-   complete the geometry. */
+/* Bottle Styling — SVG-rendered cylinder.
+   Each bottle is one <svg> (viewBox 0 0 100 160) containing a body path with
+   an elliptical curved bottom (real cylindrical silhouette), a shoulder
+   trapezoid, a neck rectangle, and a foreshortened ellipse for the top
+   opening. Cylinder shading is a horizontal linearGradient overlay. Liquid
+   layers are <rect>s clipped to the body shape; pour animation scales them
+   on the Y axis. GPU-rasterized, no 3D transforms — fast on iPhone. */
 
 .bottle {
     aspect-ratio: 0.62;
     position: relative;
     cursor: pointer;
-    /* Use container query units so face translateZ values scale with the
-       bottle's actual rendered width. */
-    container-type: inline-size;
-    perspective: 350cqw;
-    perspective-origin: 50% 30%;
-    /* Apothem (distance from axis to face plane) for each cylinder.
-       Body: radius=44% bottle width, apothem = 44 * cos(15°). */
-    --body-radius: 42.5cqw;
-    --neck-radius: 15.7cqw;
-    transition: transform 0.3s ease;
+    transition: transform 0.3s ease, filter 0.3s ease;
     filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45));
 }
 
@@ -279,244 +272,107 @@ body {
     pointer-events: none;
 }
 
-/* Firefox flattens the 3D scene per-subsection when the bottle parent has
-   `filter` AND a 2D rotate, causing the body/shoulder/neck to drift apart
-   mid-pour. Dropping the filter while pouring keeps the scene fused. */
 .bottle.pouring-source {
+    /* drop-shadow during a tilted pour is expensive; drop it for the duration. */
     filter: none;
 }
 
-.bottle.pouring-source .bottle-3d,
-.bottle.pouring-target .bottle-3d {
-    transform: rotateX(-30deg);
-    transition: none;
-}
-
-/* The 3D scene root — viewer is well above the bottle looking down into the
-   opening. Negative rotateX tilts the top of the bottle toward the camera;
-   the larger the magnitude, the steeper the downward view. */
-.bottle-3d {
+.bottle-svg {
     position: absolute;
     inset: 0;
-    transform-style: preserve-3d;
-    transform: rotateX(-30deg);
-    transform-origin: 50% 65%;
-    transition: transform 0.5s ease;
-}
-
-.bottle:hover .bottle-3d {
-    transform: rotateX(-27deg) rotateY(20deg);
-}
-
-.bottle.selected .bottle-3d {
-    transform: rotateX(-27deg) rotateY(-18deg);
-}
-
-/* Body — vertical pivot for the 12 body faces. */
-.bottle-body {
-    position: absolute;
-    left: 50%;
-    top: 22%;
-    bottom: 0;
-    width: 0;
-    transform-style: preserve-3d;
-}
-
-.body-face {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    /* Chord length of one 30° arc on radius 44cqw: 2 * 44 * sin(15°) ≈ 22.8 */
-    width: 23cqw;
-    left: -11.5cqw;
-    backface-visibility: hidden;
-    overflow: hidden;
-    /* Each face dims with cosine of its angle from camera, set inline. */
-    filter: brightness(var(--shade, 1));
-    /* Subtle vertical inner shadows give a sense of cylindrical curve on
-       each panel and help separate adjacent faces. */
-    box-shadow:
-        inset 2px 0 4px rgba(0, 0, 0, 0.15),
-        inset -2px 0 4px rgba(0, 0, 0, 0.15),
-        inset 0 -4px 8px rgba(0, 0, 0, 0.25);
-    /* Round the very bottom corners — the bottle's curved base. */
-    border-bottom-left-radius: 50% 18%;
-    border-bottom-right-radius: 50% 18%;
-}
-
-.face-layers {
-    display: flex;
-    flex-direction: column-reverse;
+    width: 100%;
     height: 100%;
-    width: 100%;
+    overflow: visible;
 }
 
-.face-layer {
-    flex: 1;
-    width: 100%;
-    position: relative;
-    /* Empty space inside the bottle reads as faint glass tint. */
-    background: rgba(255, 255, 255, 0.04);
-    transition: background 0.3s ease;
+/* Body silhouette path — fill is the glass tint behind the liquid. */
+.bottle-body-bg {
+    fill: url(#glass-tint);
 }
 
-/* Meniscus — a bright strip at the top of the cap layer. Across the 12 faces
-   it forms a continuous elliptical ring at the liquid surface. */
-.face-layer.top-layer::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 7px;
-    background: linear-gradient(
-        to bottom,
-        rgba(255, 255, 255, 0.7) 0%,
-        rgba(255, 255, 255, 0.25) 45%,
-        transparent 100%
-    );
-    pointer-events: none;
+/* Cylinder shading overlay — horizontal gradient (dark edges → bright center)
+   clipped to the body interior. Sits above the liquid layers. */
+.bottle-body-shade {
+    fill: url(#body-shade);
 }
 
-/* Hidden layer — striped grey pattern and a ? marker for sealed bottles. */
-.face-layer.hidden-layer {
-    background:
-        repeating-linear-gradient(
-            45deg,
-            #3a3a48 0 6px,
-            #4a4a58 6px 12px
-        );
-}
-
-.face-layer.hidden-layer::after {
-    content: '?';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 0.95em;
-    font-weight: 900;
-    color: rgba(255, 255, 255, 0.7);
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.75);
-    pointer-events: none;
-}
-
-/* Neck — small mini-cylinder of 8 faces on top of the body. */
-.bottle-neck {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    height: 8%;
-    width: 0;
-    transform-style: preserve-3d;
-}
-
-/* Shoulder — tapered frustum bridging the wide body and the narrow neck.
-   Each face is a trapezoid (wide at bottom, narrow at top) laid out 35cqw tall,
-   then leaned inward 50° around its bottom edge. After the lean, the top edge
-   of each face sits on the neck cylinder (radius 15.7cqw) and the bottom edge
-   on the body cylinder (radius 42.5cqw), spanning 14% of bottle height. */
 .bottle-shoulder {
-    position: absolute;
-    top: 8%;
-    left: 50%;
-    height: 14%;
-    width: 0;
-    transform-style: preserve-3d;
+    fill: url(#glass-tint);
 }
 
-.shoulder-face {
-    position: absolute;
-    bottom: 0;
-    width: 23cqw;
-    left: -11.5cqw;
-    /* Face's flat (pre-lean) length: sqrt(22.5² + 26.8²) ≈ 35cqw. */
-    height: 35cqw;
-    transform-origin: 50% 100%;
-    /* Top width 8.1cqw / 23cqw ≈ 35% of face width, centered. */
-    clip-path: polygon(32.4% 0%, 67.6% 0%, 100% 100%, 0% 100%);
-    backface-visibility: hidden;
-    background: linear-gradient(
-        to bottom,
-        rgba(210, 225, 240, 0.4) 0%,
-        rgba(180, 200, 220, 0.3) 60%,
-        rgba(160, 180, 205, 0.35) 100%
-    );
-    filter: brightness(var(--shade, 1));
-    box-shadow:
-        inset 2px 0 4px rgba(0, 0, 0, 0.18),
-        inset -2px 0 4px rgba(0, 0, 0, 0.18),
-        inset 0 6px 8px rgba(255, 255, 255, 0.12);
+/* Color overlay — sits between the glass-tint shoulder and its shading.
+   Transparent by default; opacity is driven by the liquid color class and
+   the pour drain/fill animation. */
+.bottle-shoulder-color {
+    fill: transparent;
+    opacity: 0;
+    transition: opacity 0.25s ease;
 }
 
-.neck-face {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    /* Chord for 45° on radius 17cqw: 2 * 17 * sin(22.5°) ≈ 13.0 */
-    width: 13cqw;
-    left: -6.5cqw;
-    backface-visibility: hidden;
-    background: linear-gradient(
-        to bottom,
-        rgba(210, 225, 240, 0.45) 0%,
-        rgba(180, 200, 220, 0.3) 50%,
-        rgba(150, 170, 195, 0.35) 100%
-    );
-    filter: brightness(var(--shade, 1));
-    box-shadow:
-        inset 0 3px 4px rgba(0, 0, 0, 0.4),
-        inset 0 -1px 2px rgba(255, 255, 255, 0.2);
+.bottle-shoulder-shade {
+    fill: url(#body-shade);
 }
 
-/* Top opening — a flat horizontal disc at the neck. Rotated 90° around X so
-   it lies horizontal; from the viewer's angle it foreshortens into an
-   ellipse, reading as a dark circular hole. */
+.bottle-neck {
+    fill: url(#glass-tint);
+}
+
+.bottle-neck-color {
+    fill: transparent;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.bottle-neck-shade {
+    fill: url(#neck-shade);
+}
+
+/* Top opening — foreshortened ellipse with a radial-gradient dark fill
+   reading as a circular hole viewed from above. */
 .bottle-top-cap {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    width: 31.4cqw;
-    height: 31.4cqw;
-    margin-left: -15.7cqw;
-    margin-top: -15.7cqw;
-    transform: rotateX(90deg);
-    transform-origin: center;
-    background: radial-gradient(
-        circle at 50% 50%,
-        rgba(6, 8, 16, 0.98) 0%,
-        rgba(20, 24, 36, 0.9) 45%,
-        rgba(45, 55, 75, 0.65) 80%,
-        rgba(90, 105, 130, 0.25) 95%,
-        transparent 100%
-    );
-    border-radius: 50%;
-    z-index: 4;
+    fill: url(#top-cap-grad);
 }
 
-/* Bottom — closes the bottom of the cylinder so it doesn't read as hollow. */
-.bottle-bottom-cap {
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    width: 85cqw;
-    height: 85cqw;
-    margin-left: -42.5cqw;
-    margin-bottom: -42.5cqw;
-    transform: rotateX(90deg);
-    transform-origin: center;
-    background: radial-gradient(
-        circle at 50% 50%,
-        rgba(0, 0, 0, 0.6) 0%,
-        rgba(0, 0, 0, 0.3) 65%,
-        transparent 95%
-    );
-    border-radius: 50%;
-    z-index: 1;
+/* Liquid layers — <rect>s inside .face-layers (clipped to body interior). */
+.face-layer {
+    fill: rgba(255, 255, 255, 0.04);
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    transition: fill 0.3s ease;
 }
 
-/* Sorted check overlay. Lives outside the .bottle-3d (in 2D over the scene)
-   so it always faces the camera. */
+.face-layer.hidden-layer {
+    fill: url(#hidden-pattern);
+}
+
+/* "?" marker for sealed (hidden) layers. One <text> per slot, JS toggles
+   `.active` on whichever slot is currently hidden. */
+.hidden-mark {
+    fill: rgba(255, 255, 255, 0.7);
+    font-size: 16px;
+    font-weight: 900;
+    font-family: inherit;
+    pointer-events: none;
+    display: none;
+}
+
+.hidden-mark.active {
+    display: block;
+}
+
+/* Meniscus — bright elliptical strip at the top of the current liquid level.
+   JS sets `cy` to the top of the highest filled layer and toggles `.active`. */
+.bottle-meniscus {
+    fill: rgba(255, 255, 255, 0.55);
+    pointer-events: none;
+    display: none;
+}
+
+.bottle-meniscus.active {
+    display: block;
+}
+
+/* Sorted check overlay. Sibling of the SVG, sits on top in 2D. */
 .bottle-check {
     position: absolute;
     top: 50%;
@@ -626,37 +482,53 @@ body {
     to   { transform: scaleY(1); }
 }
 
-/* Locked bottle — dim every face and desaturate so it reads as inert. */
-.bottle.locked .body-face,
-.bottle.locked .neck-face,
-.bottle.locked .shoulder-face {
-    filter: brightness(calc(var(--shade, 1) * 0.78)) saturate(0.7);
+/* Locked bottle — dim and desaturate the whole SVG so it reads as inert. */
+.bottle.locked .bottle-svg {
+    filter: brightness(0.78) saturate(0.7);
 }
 
-/* Liquid colors - vertical gradient (lighter near top, darker at depth) */
-.color-red {
-    background: linear-gradient(to bottom, #ff8a8a 0%, #e63946 45%, #a4161a 100%);
+/* Liquid colors — applied to <rect class="face-layer"> via SVG fill. Gradients
+   are defined in the shared <defs> in index.html so all bottles share them. */
+.face-layer.color-red    { fill: url(#liquid-red); }
+.face-layer.color-blue   { fill: url(#liquid-blue); }
+.face-layer.color-green  { fill: url(#liquid-green); }
+.face-layer.color-yellow { fill: url(#liquid-yellow); }
+.face-layer.color-purple { fill: url(#liquid-purple); }
+.face-layer.color-orange { fill: url(#liquid-orange); }
+.face-layer.color-pink   { fill: url(#liquid-pink); }
+.face-layer.color-cyan   { fill: url(#liquid-cyan); }
+
+/* Shoulder + neck color overlays — opacity goes to 1 when a color is applied,
+   so the cap visually "fills" with the top liquid color. The pour animation
+   transitions through draining/incoming keyframes (below) instead. */
+.bottle-shoulder-color.color-red,    .bottle-neck-color.color-red    { fill: url(#liquid-red);    opacity: 1; }
+.bottle-shoulder-color.color-blue,   .bottle-neck-color.color-blue   { fill: url(#liquid-blue);   opacity: 1; }
+.bottle-shoulder-color.color-green,  .bottle-neck-color.color-green  { fill: url(#liquid-green);  opacity: 1; }
+.bottle-shoulder-color.color-yellow, .bottle-neck-color.color-yellow { fill: url(#liquid-yellow); opacity: 1; }
+.bottle-shoulder-color.color-purple, .bottle-neck-color.color-purple { fill: url(#liquid-purple); opacity: 1; }
+.bottle-shoulder-color.color-orange, .bottle-neck-color.color-orange { fill: url(#liquid-orange); opacity: 1; }
+.bottle-shoulder-color.color-pink,   .bottle-neck-color.color-pink   { fill: url(#liquid-pink);   opacity: 1; }
+.bottle-shoulder-color.color-cyan,   .bottle-neck-color.color-cyan   { fill: url(#liquid-cyan);   opacity: 1; }
+
+/* Synchronized with the layer drain/fill animation — same 0.34s timing. */
+.bottle-shoulder-color.draining,
+.bottle-neck-color.draining {
+    animation: capDrain 0.34s ease-in forwards;
 }
-.color-blue {
-    background: linear-gradient(to bottom, #6cb4ee 0%, #2874a6 45%, #0e3f66 100%);
+
+@keyframes capDrain {
+    from { opacity: 1; }
+    to   { opacity: 0; }
 }
-.color-green {
-    background: linear-gradient(to bottom, #6fd98a 0%, #229954 45%, #145a32 100%);
+
+.bottle-shoulder-color.incoming,
+.bottle-neck-color.incoming {
+    animation: capFill 0.34s ease-out forwards;
 }
-.color-yellow {
-    background: linear-gradient(to bottom, #ffec80 0%, #f4a300 45%, #9c5a00 100%);
-}
-.color-purple {
-    background: linear-gradient(to bottom, #c79be3 0%, #884ea0 45%, #4a235a 100%);
-}
-.color-orange {
-    background: linear-gradient(to bottom, #ffc18a 0%, #f5760a 45%, #a23e00 100%);
-}
-.color-pink {
-    background: linear-gradient(to bottom, #f7adc8 0%, #d63384 45%, #851750 100%);
-}
-.color-cyan {
-    background: linear-gradient(to bottom, #82dfd2 0%, #17a589 45%, #0b4f4a 100%);
+
+@keyframes capFill {
+    from { opacity: 0; }
+    to   { opacity: 1; }
 }
 
 

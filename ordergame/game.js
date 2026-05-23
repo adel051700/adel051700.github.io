@@ -402,9 +402,12 @@ class BottleSortGame {
         // at a time rather than vanishing/appearing all at once.
         const fromBottle = this.bottles[fromIndex];
         const toBottle = this.bottles[toIndex];
-        const sourceFaceLayers = source.querySelectorAll('.body-face .face-layers');
-        const targetFaceLayers = target.querySelectorAll('.body-face .face-layers');
+        const sourceFaceLayers = source.querySelectorAll('.face-layers');
+        const targetFaceLayers = target.querySelectorAll('.face-layers');
+        const sourceCaps = source.querySelectorAll('.bottle-shoulder-color, .bottle-neck-color');
+        const targetCaps = target.querySelectorAll('.bottle-shoulder-color, .bottle-neck-color');
         const colorClass = this.colors[colorIdx].class;
+        const topPos = this.bottleCapacity - 1;
         const layerStep = 130;
 
         for (let i = 0; i < pourCount; i++) {
@@ -419,6 +422,14 @@ class BottleSortGame {
                     const layer = fl.children[tgtLayerIdx];
                     if (layer) layer.classList.add('incoming', colorClass);
                 });
+                // When the layer being drained/filled is the topmost slot, the
+                // shoulder + neck visible color changes too — fade them in sync.
+                if (srcLayerIdx === topPos) {
+                    sourceCaps.forEach(c => c.classList.add('draining'));
+                }
+                if (tgtLayerIdx === topPos) {
+                    targetCaps.forEach(c => c.classList.add('incoming', colorClass));
+                }
             }, i * layerStep);
         }
 
@@ -576,11 +587,9 @@ class BottleSortGame {
         const grid = document.getElementById('bottles-grid');
         if (!grid) return;
 
-        // Building ~700 DOM nodes per call (10 bottles × 12 body faces ×
-        // 4 layers + shoulders/necks/caps) makes every tap janky on iPhone.
-        // Build the bottle DOM once and just toggle classes / shoulder-neck
-        // colors on subsequent renders; rebuild only if the bottle count
-        // changes (level transition).
+        // Build the bottle SVGs once; subsequent renders just toggle classes
+        // and update meniscus/hidden marks. Full rebuild only when the bottle
+        // count changes (level transition).
         if (!this._bottleEls || this._bottleEls.length !== this.bottles.length) {
             this._rebuildBottleDom();
         }
@@ -598,107 +607,150 @@ class BottleSortGame {
         this._bottleEls = [];
         this._bottleRefs = [];
 
-        // Touch / small-screen devices (notably iPhone) can't keep up with
-        // 12 body × 4 layer × 10 bottle DOM nodes in a 3D context — cut face
-        // counts in half and retune face widths so the cylinders still tile.
-        const isMobile = window.matchMedia('(max-width: 768px), (pointer: coarse)').matches;
-        const BODY_FACES = isMobile ? 6 : 12;
-        const SHOULDER_FACES = isMobile ? 6 : 12;
-        const NECK_FACES = isMobile ? 6 : 8;
+        // SVG geometry (viewBox 0 0 100 160):
+        //   Body: x∈[7.5, 92.5], straight sides y∈[35.2, 138.75], elliptical
+        //         bottom arc (rx=42.5, ry=21.25) sweeping down to y=160.
+        //   Shoulder: trapezoid from body top (35.2) up to neck (y=12.8),
+        //             narrowing from x=[7.5,92.5] to x=[34.3,65.7].
+        //   Neck: rectangle x∈[34.3,65.7], y∈[7.85,12.8].
+        //   Top opening: ellipse at (50, 7.85), rx=15.7, ry=7.85 (30° tilt).
+        const BODY_X1 = 7.5, BODY_X2 = 92.5, BODY_Y_TOP = 35.2;
+        const BODY_Y_FLAT_BOTTOM = 138.75, BODY_Y_DEEP = 160;
+        const BODY_R = 42.5, BODY_RY = 21.25;
+        const NECK_X1 = 34.3, NECK_X2 = 65.7;
+        const NECK_Y_TOP = 7.85, NECK_Y_BOTTOM = 12.8;
+        const NECK_RX = 15.7, NECK_RY = 7.85;
+        const LAYER_H = (BODY_Y_DEEP - BODY_Y_TOP) / this.bottleCapacity;
 
-        // Default CSS face widths (23cqw / 23cqw / 13cqw) match 12/12/8.
-        // For other counts, chord = 2 * apothem * tan(180/n). Apothems are the
-        // baked --body-radius (42.5cqw) and --neck-radius (15.7cqw).
-        const BODY_APO = 42.5, NECK_APO = 15.7;
-        const bodyW = 2 * BODY_APO * Math.tan(Math.PI / BODY_FACES);
-        const neckW = 2 * NECK_APO * Math.tan(Math.PI / NECK_FACES);
-        const shoulderW = bodyW;
-        const overrideWidths = isMobile;
+        const bodyPath = `M ${BODY_X1} ${BODY_Y_TOP} L ${BODY_X1} ${BODY_Y_FLAT_BOTTOM} A ${BODY_R} ${BODY_RY} 0 0 0 ${BODY_X2} ${BODY_Y_FLAT_BOTTOM} L ${BODY_X2} ${BODY_Y_TOP} Z`;
+        const shoulderPath = `M ${BODY_X1} ${BODY_Y_TOP} L ${BODY_X2} ${BODY_Y_TOP} L ${NECK_X2} ${NECK_Y_BOTTOM} L ${NECK_X1} ${NECK_Y_BOTTOM} Z`;
+        const neckPath = `M ${NECK_X1} ${NECK_Y_TOP} L ${NECK_X2} ${NECK_Y_TOP} L ${NECK_X2} ${NECK_Y_BOTTOM} L ${NECK_X1} ${NECK_Y_BOTTOM} Z`;
+
+        const SVG_NS = 'http://www.w3.org/2000/svg';
+        const svgEl = (tag, attrs) => {
+            const el = document.createElementNS(SVG_NS, tag);
+            for (const k in attrs) el.setAttribute(k, attrs[k]);
+            return el;
+        };
 
         for (let index = 0; index < this.bottles.length; index++) {
             const bottleElement = document.createElement('div');
             bottleElement.className = 'bottle';
 
-            const scene = document.createElement('div');
-            scene.className = 'bottle-3d';
+            const svg = svgEl('svg', {
+                class: 'bottle-svg',
+                viewBox: '0 0 100 160',
+                preserveAspectRatio: 'xMidYMid meet',
+            });
 
-            const body = document.createElement('div');
-            body.className = 'bottle-body';
-            // refs.layerRefsByPos[pos] is the list of layer divs (one per face)
-            // sitting at vertical position `pos` of this bottle.
-            const layerRefsByPos = Array.from({ length: this.bottleCapacity }, () => []);
-            for (let f = 0; f < BODY_FACES; f++) {
-                const angle = f * (360 / BODY_FACES);
-                const face = document.createElement('div');
-                face.className = 'body-face';
-                face.style.transform = `rotateY(${angle}deg) translateZ(var(--body-radius))`;
-                const shade = 0.45 + 0.55 * Math.cos(angle * Math.PI / 180);
-                face.style.setProperty('--shade', Math.max(0.35, shade).toFixed(3));
-                if (overrideWidths) {
-                    face.style.width = bodyW.toFixed(2) + 'cqw';
-                    face.style.left = (-bodyW / 2).toFixed(2) + 'cqw';
-                }
+            // Body background (glass tint visible behind any unfilled space).
+            svg.appendChild(svgEl('path', { class: 'bottle-body-bg', d: bodyPath }));
 
-                const layers = document.createElement('div');
-                layers.className = 'face-layers';
-                for (let i = 0; i < this.bottleCapacity; i++) {
-                    const layer = document.createElement('div');
-                    layer.className = 'face-layer';
-                    layers.appendChild(layer);
-                    layerRefsByPos[i].push(layer);
-                }
-                face.appendChild(layers);
-                body.appendChild(face);
+            // Liquid layers — one <rect> per capacity slot, clipped to body shape.
+            // Positions index from bottom (0) to top (capacity-1).
+            const layersGroup = svgEl('g', {
+                class: 'face-layers',
+                'clip-path': 'url(#body-clip)',
+            });
+            const layerRefsByPos = [];
+            for (let pos = 0; pos < this.bottleCapacity; pos++) {
+                const y = BODY_Y_TOP + (this.bottleCapacity - 1 - pos) * LAYER_H;
+                const rect = svgEl('rect', {
+                    class: 'face-layer',
+                    'data-pos': pos,
+                    x: BODY_X1,
+                    y: y,
+                    width: BODY_X2 - BODY_X1,
+                    height: LAYER_H,
+                });
+                layersGroup.appendChild(rect);
+                layerRefsByPos.push([rect]);
             }
-            scene.appendChild(body);
+            svg.appendChild(layersGroup);
 
-            const shoulder = document.createElement('div');
-            shoulder.className = 'bottle-shoulder';
-            const shoulderFaces = [];
-            for (let f = 0; f < SHOULDER_FACES; f++) {
-                const angle = f * (360 / SHOULDER_FACES);
-                const face = document.createElement('div');
-                face.className = 'shoulder-face';
-                face.style.transform = `rotateY(${angle}deg) translateZ(var(--body-radius)) rotateX(50deg)`;
-                const shade = 0.45 + 0.55 * Math.cos(angle * Math.PI / 180);
-                face.style.setProperty('--shade', Math.max(0.35, shade).toFixed(3));
-                if (overrideWidths) {
-                    face.style.width = shoulderW.toFixed(2) + 'cqw';
-                    face.style.left = (-shoulderW / 2).toFixed(2) + 'cqw';
-                }
-                shoulder.appendChild(face);
-                shoulderFaces.push(face);
+            // Hidden-layer "?" markers — one per slot, all hidden by default.
+            const hiddenGroup = svgEl('g', {
+                class: 'hidden-marks',
+                'clip-path': 'url(#body-clip)',
+            });
+            const hiddenMarksByPos = [];
+            for (let pos = 0; pos < this.bottleCapacity; pos++) {
+                const y = BODY_Y_TOP + (this.bottleCapacity - 1 - pos) * LAYER_H + LAYER_H / 2;
+                const text = svgEl('text', {
+                    class: 'hidden-mark',
+                    'data-pos': pos,
+                    x: 50,
+                    y: y,
+                    'text-anchor': 'middle',
+                    'dominant-baseline': 'central',
+                });
+                text.textContent = '?';
+                hiddenGroup.appendChild(text);
+                hiddenMarksByPos.push(text);
             }
-            scene.appendChild(shoulder);
+            svg.appendChild(hiddenGroup);
 
-            const neck = document.createElement('div');
-            neck.className = 'bottle-neck';
-            const neckFaces = [];
-            for (let f = 0; f < NECK_FACES; f++) {
-                const angle = f * (360 / NECK_FACES);
-                const face = document.createElement('div');
-                face.className = 'neck-face';
-                face.style.transform = `rotateY(${angle}deg) translateZ(var(--neck-radius))`;
-                const shade = 0.5 + 0.5 * Math.cos(angle * Math.PI / 180);
-                face.style.setProperty('--shade', Math.max(0.35, shade).toFixed(3));
-                if (overrideWidths) {
-                    face.style.width = neckW.toFixed(2) + 'cqw';
-                    face.style.left = (-neckW / 2).toFixed(2) + 'cqw';
-                }
-                neck.appendChild(face);
-                neckFaces.push(face);
-            }
-            scene.appendChild(neck);
+            // Meniscus — bright ellipse at the top of the topmost liquid layer.
+            const meniscus = svgEl('ellipse', {
+                class: 'bottle-meniscus',
+                cx: 50,
+                cy: BODY_Y_TOP,
+                rx: BODY_R,
+                ry: 2.2,
+            });
+            svg.appendChild(meniscus);
 
-            const topCap = document.createElement('div');
-            topCap.className = 'bottle-top-cap';
-            scene.appendChild(topCap);
+            // Cylinder shading overlay on the body — sits above liquid + meniscus.
+            svg.appendChild(svgEl('rect', {
+                class: 'bottle-body-shade',
+                x: BODY_X1,
+                y: BODY_Y_TOP,
+                width: BODY_X2 - BODY_X1,
+                height: BODY_Y_DEEP - BODY_Y_TOP,
+                'clip-path': 'url(#body-clip)',
+                'pointer-events': 'none',
+            }));
 
-            const botCap = document.createElement('div');
-            botCap.className = 'bottle-bottom-cap';
-            scene.appendChild(botCap);
+            // Shoulder — three stacked paths (glass tint → color overlay → shading).
+            // The color overlay is what holds the liquid color when the bottle is
+            // full; its opacity animates during a pour to drain/fill the cap.
+            svg.appendChild(svgEl('path', { class: 'bottle-shoulder', d: shoulderPath }));
+            const shoulderColor = svgEl('path', {
+                class: 'bottle-shoulder-color',
+                d: shoulderPath,
+                'pointer-events': 'none',
+            });
+            svg.appendChild(shoulderColor);
+            svg.appendChild(svgEl('path', {
+                class: 'bottle-shoulder-shade',
+                d: shoulderPath,
+                'pointer-events': 'none',
+            }));
 
-            bottleElement.appendChild(scene);
+            // Neck — same three-stack treatment.
+            svg.appendChild(svgEl('path', { class: 'bottle-neck', d: neckPath }));
+            const neckColor = svgEl('path', {
+                class: 'bottle-neck-color',
+                d: neckPath,
+                'pointer-events': 'none',
+            });
+            svg.appendChild(neckColor);
+            svg.appendChild(svgEl('path', {
+                class: 'bottle-neck-shade',
+                d: neckPath,
+                'pointer-events': 'none',
+            }));
+
+            // Top opening — foreshortened dark ellipse reads as the rim hole.
+            svg.appendChild(svgEl('ellipse', {
+                class: 'bottle-top-cap',
+                cx: 50,
+                cy: NECK_Y_TOP,
+                rx: NECK_RX,
+                ry: NECK_RY,
+            }));
+
+            bottleElement.appendChild(svg);
 
             const check = document.createElement('div');
             check.className = 'bottle-check';
@@ -709,7 +761,18 @@ class BottleSortGame {
 
             grid.appendChild(bottleElement);
             this._bottleEls.push(bottleElement);
-            this._bottleRefs.push({ layerRefsByPos, shoulderFaces, neckFaces });
+            this._bottleRefs.push({
+                layerRefsByPos,
+                hiddenMarksByPos,
+                meniscus,
+                // shoulderFaces/neckFaces point at the color-overlay path. The
+                // glass-tint base is static and never gets colored, so applying
+                // a color class to the overlay is what makes the cap "fill in".
+                shoulderFaces: [shoulderColor],
+                neckFaces: [neckColor],
+                layerTopY: BODY_Y_TOP,
+                layerH: LAYER_H,
+            });
         }
     }
 
@@ -738,6 +801,10 @@ class BottleSortGame {
         }
         const allColors = this._allColorClasses;
 
+        // Track the position of the topmost visible (non-hidden) liquid layer
+        // so we can park the meniscus there.
+        let topVisiblePos = -1;
+
         for (let pos = 0; pos < this.bottleCapacity; pos++) {
             let colorClass = null;
             let isHidden = false;
@@ -748,6 +815,7 @@ class BottleSortGame {
                 } else {
                     colorClass = this.colors[bottle[pos]].class;
                     isTop = (pos === bottle.length - 1);
+                    if (isTop) topVisiblePos = pos;
                 }
             }
             for (const layer of refs.layerRefsByPos[pos]) {
@@ -759,14 +827,29 @@ class BottleSortGame {
                 if (colorClass) layer.classList.add(colorClass);
                 if (isTop) layer.classList.add('top-layer');
             }
+            const mark = refs.hiddenMarksByPos[pos];
+            if (mark) mark.classList.toggle('active', isHidden);
+        }
+
+        // Meniscus sits at the top edge of the topmost visible liquid layer.
+        if (refs.meniscus) {
+            if (topVisiblePos >= 0) {
+                const topY = refs.layerTopY + (this.bottleCapacity - 1 - topVisiblePos) * refs.layerH;
+                refs.meniscus.setAttribute('cy', topY);
+                refs.meniscus.classList.add('active');
+            } else {
+                refs.meniscus.classList.remove('active');
+            }
         }
 
         for (const face of refs.shoulderFaces) {
             for (const c of allColors) face.classList.remove(c);
+            face.classList.remove('draining', 'incoming');
             if (topColorClass) face.classList.add(topColorClass);
         }
         for (const face of refs.neckFaces) {
             for (const c of allColors) face.classList.remove(c);
+            face.classList.remove('draining', 'incoming');
             if (topColorClass) face.classList.add(topColorClass);
         }
     }

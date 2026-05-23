@@ -12,6 +12,87 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- Shared SVG defs for all bottle gradients, patterns, and clip paths.
+         Referenced by each per-bottle <svg> via url(#id). Defined once here so
+         _rebuildBottleDom doesn't have to recreate them on every game reset. -->
+    <svg class="bottle-defs" width="0" height="0" aria-hidden="true" style="position:absolute">
+        <defs>
+            <!-- Cylinder shading (horizontal: dark edges, bright center) -->
+            <linearGradient id="body-shade" x1="0%" x2="100%" y1="0%" y2="0%">
+                <stop offset="0%"   stop-color="#000" stop-opacity="0.55"/>
+                <stop offset="8%"   stop-color="#000" stop-opacity="0.28"/>
+                <stop offset="22%"  stop-color="#000" stop-opacity="0.06"/>
+                <stop offset="50%"  stop-color="#fff" stop-opacity="0.10"/>
+                <stop offset="78%"  stop-color="#000" stop-opacity="0.06"/>
+                <stop offset="92%"  stop-color="#000" stop-opacity="0.28"/>
+                <stop offset="100%" stop-color="#000" stop-opacity="0.55"/>
+            </linearGradient>
+            <linearGradient id="neck-shade" x1="0%" x2="100%" y1="0%" y2="0%">
+                <stop offset="0%"   stop-color="#000" stop-opacity="0.5"/>
+                <stop offset="14%"  stop-color="#000" stop-opacity="0.18"/>
+                <stop offset="32%"  stop-color="#000" stop-opacity="0.04"/>
+                <stop offset="50%"  stop-color="#fff" stop-opacity="0.12"/>
+                <stop offset="68%"  stop-color="#000" stop-opacity="0.04"/>
+                <stop offset="86%"  stop-color="#000" stop-opacity="0.18"/>
+                <stop offset="100%" stop-color="#000" stop-opacity="0.5"/>
+            </linearGradient>
+
+            <!-- Glass tint — default fill for body/shoulder/neck (empty bottle look) -->
+            <linearGradient id="glass-tint" x1="0%" x2="0%" y1="0%" y2="100%">
+                <stop offset="0%"   stop-color="#d2e1f0" stop-opacity="0.40"/>
+                <stop offset="50%"  stop-color="#b4c8dc" stop-opacity="0.30"/>
+                <stop offset="100%" stop-color="#a0b4cd" stop-opacity="0.35"/>
+            </linearGradient>
+
+            <!-- Liquid color gradients (vertical: lighter top, darker bottom) -->
+            <linearGradient id="liquid-red" x1="0%" x2="0%" y1="0%" y2="100%">
+                <stop offset="0%" stop-color="#ff8a8a"/><stop offset="45%" stop-color="#e63946"/><stop offset="100%" stop-color="#a4161a"/>
+            </linearGradient>
+            <linearGradient id="liquid-blue" x1="0%" x2="0%" y1="0%" y2="100%">
+                <stop offset="0%" stop-color="#6cb4ee"/><stop offset="45%" stop-color="#2874a6"/><stop offset="100%" stop-color="#0e3f66"/>
+            </linearGradient>
+            <linearGradient id="liquid-green" x1="0%" x2="0%" y1="0%" y2="100%">
+                <stop offset="0%" stop-color="#6fd98a"/><stop offset="45%" stop-color="#229954"/><stop offset="100%" stop-color="#145a32"/>
+            </linearGradient>
+            <linearGradient id="liquid-yellow" x1="0%" x2="0%" y1="0%" y2="100%">
+                <stop offset="0%" stop-color="#ffec80"/><stop offset="45%" stop-color="#f4a300"/><stop offset="100%" stop-color="#9c5a00"/>
+            </linearGradient>
+            <linearGradient id="liquid-purple" x1="0%" x2="0%" y1="0%" y2="100%">
+                <stop offset="0%" stop-color="#c79be3"/><stop offset="45%" stop-color="#884ea0"/><stop offset="100%" stop-color="#4a235a"/>
+            </linearGradient>
+            <linearGradient id="liquid-orange" x1="0%" x2="0%" y1="0%" y2="100%">
+                <stop offset="0%" stop-color="#ffc18a"/><stop offset="45%" stop-color="#f5760a"/><stop offset="100%" stop-color="#a23e00"/>
+            </linearGradient>
+            <linearGradient id="liquid-pink" x1="0%" x2="0%" y1="0%" y2="100%">
+                <stop offset="0%" stop-color="#f7adc8"/><stop offset="45%" stop-color="#d63384"/><stop offset="100%" stop-color="#851750"/>
+            </linearGradient>
+            <linearGradient id="liquid-cyan" x1="0%" x2="0%" y1="0%" y2="100%">
+                <stop offset="0%" stop-color="#82dfd2"/><stop offset="45%" stop-color="#17a589"/><stop offset="100%" stop-color="#0b4f4a"/>
+            </linearGradient>
+
+            <!-- Body interior clip — keeps liquid inside the cylinder silhouette,
+                 including the curved bottom. -->
+            <clipPath id="body-clip">
+                <path d="M 7.5 35.2 L 7.5 138.75 A 42.5 21.25 0 0 0 92.5 138.75 L 92.5 35.2 Z"/>
+            </clipPath>
+
+            <!-- Hidden-layer striped pattern -->
+            <pattern id="hidden-pattern" patternUnits="userSpaceOnUse" width="12" height="12" patternTransform="rotate(45)">
+                <rect width="6" height="12" fill="#3a3a48"/>
+                <rect x="6" width="6" height="12" fill="#4a4a58"/>
+            </pattern>
+
+            <!-- Dark elliptical opening at the top of the neck -->
+            <radialGradient id="top-cap-grad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%"   stop-color="#06080F" stop-opacity="0.98"/>
+                <stop offset="45%"  stop-color="#141824" stop-opacity="0.90"/>
+                <stop offset="80%"  stop-color="#2d374b" stop-opacity="0.65"/>
+                <stop offset="95%"  stop-color="#5a6982" stop-opacity="0.25"/>
+                <stop offset="100%" stop-color="#5a6982" stop-opacity="0"/>
+            </radialGradient>
+        </defs>
+    </svg>
+
     <div id="game-container">
         <!-- Menu Screen -->
         <div id="menu-screen" class="screen active">
