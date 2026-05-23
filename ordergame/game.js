@@ -598,9 +598,22 @@ class BottleSortGame {
         this._bottleEls = [];
         this._bottleRefs = [];
 
-        const BODY_FACES = 12;
-        const SHOULDER_FACES = 12;
-        const NECK_FACES = 8;
+        // Touch / small-screen devices (notably iPhone) can't keep up with
+        // 12 body × 4 layer × 10 bottle DOM nodes in a 3D context — cut face
+        // counts in half and retune face widths so the cylinders still tile.
+        const isMobile = window.matchMedia('(max-width: 768px), (pointer: coarse)').matches;
+        const BODY_FACES = isMobile ? 6 : 12;
+        const SHOULDER_FACES = isMobile ? 6 : 12;
+        const NECK_FACES = isMobile ? 6 : 8;
+
+        // Default CSS face widths (23cqw / 23cqw / 13cqw) match 12/12/8.
+        // For other counts, chord = 2 * apothem * tan(180/n). Apothems are the
+        // baked --body-radius (42.5cqw) and --neck-radius (15.7cqw).
+        const BODY_APO = 42.5, NECK_APO = 15.7;
+        const bodyW = 2 * BODY_APO * Math.tan(Math.PI / BODY_FACES);
+        const neckW = 2 * NECK_APO * Math.tan(Math.PI / NECK_FACES);
+        const shoulderW = bodyW;
+        const overrideWidths = isMobile;
 
         for (let index = 0; index < this.bottles.length; index++) {
             const bottleElement = document.createElement('div');
@@ -621,6 +634,10 @@ class BottleSortGame {
                 face.style.transform = `rotateY(${angle}deg) translateZ(var(--body-radius))`;
                 const shade = 0.45 + 0.55 * Math.cos(angle * Math.PI / 180);
                 face.style.setProperty('--shade', Math.max(0.35, shade).toFixed(3));
+                if (overrideWidths) {
+                    face.style.width = bodyW.toFixed(2) + 'cqw';
+                    face.style.left = (-bodyW / 2).toFixed(2) + 'cqw';
+                }
 
                 const layers = document.createElement('div');
                 layers.className = 'face-layers';
@@ -645,6 +662,10 @@ class BottleSortGame {
                 face.style.transform = `rotateY(${angle}deg) translateZ(var(--body-radius)) rotateX(50deg)`;
                 const shade = 0.45 + 0.55 * Math.cos(angle * Math.PI / 180);
                 face.style.setProperty('--shade', Math.max(0.35, shade).toFixed(3));
+                if (overrideWidths) {
+                    face.style.width = shoulderW.toFixed(2) + 'cqw';
+                    face.style.left = (-shoulderW / 2).toFixed(2) + 'cqw';
+                }
                 shoulder.appendChild(face);
                 shoulderFaces.push(face);
             }
@@ -660,6 +681,10 @@ class BottleSortGame {
                 face.style.transform = `rotateY(${angle}deg) translateZ(var(--neck-radius))`;
                 const shade = 0.5 + 0.5 * Math.cos(angle * Math.PI / 180);
                 face.style.setProperty('--shade', Math.max(0.35, shade).toFixed(3));
+                if (overrideWidths) {
+                    face.style.width = neckW.toFixed(2) + 'cqw';
+                    face.style.left = (-neckW / 2).toFixed(2) + 'cqw';
+                }
                 neck.appendChild(face);
                 neckFaces.push(face);
             }
