@@ -27,14 +27,14 @@ class BottleSortGame {
 
         // Color palette
         this.colorPalette = [
-            { name: 'red', class: 'color-red' },
-            { name: 'blue', class: 'color-blue' },
-            { name: 'green', class: 'color-green' },
-            { name: 'yellow', class: 'color-yellow' },
-            { name: 'purple', class: 'color-purple' },
-            { name: 'orange', class: 'color-orange' },
-            { name: 'pink', class: 'color-pink' },
-            { name: 'cyan', class: 'color-cyan' }
+            { name: 'red', class: 'color-red', stream: { light: '#ff9b9b', mid: '#e63946', dark: '#9f171d', glow: 'rgba(230, 57, 70, 0.58)' } },
+            { name: 'blue', class: 'color-blue', stream: { light: '#79c4ff', mid: '#2874a6', dark: '#0b3a5f', glow: 'rgba(40, 116, 166, 0.58)' } },
+            { name: 'green', class: 'color-green', stream: { light: '#82e69c', mid: '#229954', dark: '#10542e', glow: 'rgba(34, 153, 84, 0.58)' } },
+            { name: 'yellow', class: 'color-yellow', stream: { light: '#fff099', mid: '#f4a300', dark: '#985600', glow: 'rgba(244, 163, 0, 0.58)' } },
+            { name: 'purple', class: 'color-purple', stream: { light: '#d5a7ef', mid: '#884ea0', dark: '#452053', glow: 'rgba(136, 78, 160, 0.58)' } },
+            { name: 'orange', class: 'color-orange', stream: { light: '#ffc996', mid: '#f5760a', dark: '#9b3900', glow: 'rgba(245, 118, 10, 0.58)' } },
+            { name: 'pink', class: 'color-pink', stream: { light: '#ffbed8', mid: '#d63384', dark: '#7f134b', glow: 'rgba(214, 51, 132, 0.58)' } },
+            { name: 'cyan', class: 'color-cyan', stream: { light: '#92eee1', mid: '#17a589', dark: '#074b46', glow: 'rgba(23, 165, 137, 0.58)' } }
         ];
         
         this.init();
@@ -366,14 +366,29 @@ class BottleSortGame {
         // Wait for the existing .bottle transform transition (0.3s) to finish.
         await this.wait(360);
 
-        // Compute the spout and opening positions in grid-local coordinates so
-        // the SVG path can render against the grid's box.
-        const srcRectAfter = source.getBoundingClientRect();
+        // Compute the stream endpoints in grid-local coordinates. The source
+        // start is a transformed point on the mouth edge; using the rotated
+        // bounding box would place the stream above the real rim.
         const tgtRectAfter = target.getBoundingClientRect();
-        const spoutX = srcRectAfter.left + srcRectAfter.width / 2 + dir * srcRectAfter.width * 0.34 - gridRect.left;
-        const spoutY = srcRectAfter.top + srcRectAfter.height * 0.16 - gridRect.top;
+        const tiltSignedRad = tiltDeg * Math.PI / 180;
+        const cosTilt = Math.cos(tiltSignedRad);
+        const sinTilt = Math.sin(tiltSignedRad);
+        const originX = srcRect.left + srcRect.width / 2;
+        const originY = srcRect.top + srcRect.height;
+        const mouthX = srcRect.left + srcRect.width * (0.5 + dir * 0.36);
+        const mouthY = srcRect.top + srcRect.height * 0.14;
+        const mouthRelX = mouthX - originX;
+        const mouthRelY = mouthY - originY;
+        const spoutX = originX + dx + mouthRelX * cosTilt - mouthRelY * sinTilt - gridRect.left;
+        const spoutY = originY + dy + mouthRelX * sinTilt + mouthRelY * cosTilt - gridRect.top;
         const openX = tgtRectAfter.left + tgtRectAfter.width / 2 - gridRect.left;
-        const openY = tgtRectAfter.top + tgtRectAfter.height * 0.1 - gridRect.top;
+        const targetCurrentLevel = this.bottles[toIndex].length;
+        const targetLayerH = (148 - 22) / this.bottleCapacity;
+        const targetImpactRatio = Math.min(
+            0.62,
+            Math.max(0.28, (148 - (targetCurrentLevel + 1) * targetLayerH) / 160)
+        );
+        const openY = tgtRectAfter.top + tgtRectAfter.height * targetImpactRatio - gridRect.top;
 
         const svgNS = 'http://www.w3.org/2000/svg';
         const overlay = document.createElement('div');
@@ -381,17 +396,127 @@ class BottleSortGame {
         const svg = document.createElementNS(svgNS, 'svg');
         svg.setAttribute('viewBox', `0 0 ${gridRect.width} ${gridRect.height}`);
         svg.setAttribute('preserveAspectRatio', 'none');
-        const path = document.createElementNS(svgNS, 'path');
-        // Cubic Bezier: control points pull the arc downward like a real stream.
-        const arcDrop = Math.max(30, Math.abs(openX - spoutX) * 0.25);
-        const midY = Math.max(spoutY, openY) + arcDrop;
-        const cp1x = spoutX + dir * 8;
-        const cp1y = spoutY + 18;
-        const cp2x = openX - dir * 8;
-        const cp2y = midY;
-        path.setAttribute('d', `M ${spoutX} ${spoutY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${openX} ${openY}`);
-        path.setAttribute('class', `pour-stream-path ${this.colors[colorIdx].class}`);
-        svg.appendChild(path);
+        // Move a few pixels out from the lip and bend toward the actual
+        // destination, so close pours do not curl back around the source rim.
+        const lipToOpenX = openX - spoutX;
+        const lipToOpenY = openY - spoutY;
+        const lipToOpenLen = Math.hypot(lipToOpenX, lipToOpenY) || 1;
+        const startX = spoutX + (lipToOpenX / lipToOpenLen) * 3;
+        const startY = spoutY + (lipToOpenY / lipToOpenLen) * 3;
+        const flowX = openX - startX;
+        const flowY = openY - startY;
+        const flowLen = Math.hypot(flowX, flowY);
+        const sag = Math.min(16, Math.max(3, flowLen * 0.12));
+        const cp1x = startX + flowX * 0.28;
+        const cp1y = startY + flowY * 0.18 + sag;
+        const cp2x = startX + flowX * 0.72;
+        const cp2y = startY + flowY * 0.82 + sag * 0.12;
+
+        const makeSvgEl = (tag, attrs = {}) => {
+            const el = document.createElementNS(svgNS, tag);
+            for (const key in attrs) el.setAttribute(key, attrs[key]);
+            return el;
+        };
+        const cubicPath = `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${openX} ${openY}`;
+        const streamColors = this.colors[colorIdx].stream;
+        const streamId = `pour-stream-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        const gradientId = `${streamId}-gradient`;
+
+        const defs = makeSvgEl('defs');
+        const gradient = makeSvgEl('linearGradient', {
+            id: gradientId,
+            gradientUnits: 'userSpaceOnUse',
+            x1: startX,
+            y1: startY,
+            x2: openX,
+            y2: openY,
+        });
+        [
+            ['0%', streamColors.light],
+            ['42%', streamColors.mid],
+            ['100%', streamColors.dark],
+        ].forEach(([offset, color]) => {
+            gradient.appendChild(makeSvgEl('stop', { offset, 'stop-color': color }));
+        });
+        defs.appendChild(gradient);
+        svg.appendChild(defs);
+
+        const pointAt = (t) => {
+            const mt = 1 - t;
+            return {
+                x: mt ** 3 * startX + 3 * mt ** 2 * t * cp1x + 3 * mt * t ** 2 * cp2x + t ** 3 * openX,
+                y: mt ** 3 * startY + 3 * mt ** 2 * t * cp1y + 3 * mt * t ** 2 * cp2y + t ** 3 * openY,
+            };
+        };
+        const normalAt = (t) => {
+            const mt = 1 - t;
+            const dx = 3 * mt ** 2 * (cp1x - startX) + 6 * mt * t * (cp2x - cp1x) + 3 * t ** 2 * (openX - cp2x);
+            const dy = 3 * mt ** 2 * (cp1y - startY) + 6 * mt * t * (cp2y - cp1y) + 3 * t ** 2 * (openY - cp2y);
+            const len = Math.hypot(dx, dy) || 1;
+            return { x: -dy / len, y: dx / len };
+        };
+        const widthAt = (t) => {
+            const throat = Math.sin(Math.PI * t);
+            const landingFlare = Math.max(0, (t - 0.78) / 0.22);
+            return 4.8 - throat * 1.2 + landingFlare * 2.1;
+        };
+        const edgeA = [];
+        const edgeB = [];
+        for (let i = 0; i <= 18; i++) {
+            const t = i / 18;
+            const point = pointAt(t);
+            const normal = normalAt(t);
+            const ripple = Math.sin(t * Math.PI * 5 + (dir > 0 ? 0.4 : 1.1)) * 0.32;
+            const halfWidth = widthAt(t) + ripple;
+            edgeA.push([point.x + normal.x * halfWidth, point.y + normal.y * halfWidth]);
+            edgeB.unshift([point.x - normal.x * halfWidth, point.y - normal.y * halfWidth]);
+        }
+        const ribbonD = [...edgeA, ...edgeB]
+            .map(([x, y], i) => `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`)
+            .join(' ') + ' Z';
+
+        const streamGroup = makeSvgEl('g', { class: `pour-stream ${this.colors[colorIdx].class}` });
+        streamGroup.style.setProperty('--stream-main', streamColors.mid);
+        streamGroup.style.setProperty('--stream-light', streamColors.light);
+        streamGroup.style.setProperty('--stream-dark', streamColors.dark);
+        streamGroup.style.setProperty('--stream-glow', streamColors.glow);
+
+        streamGroup.appendChild(makeSvgEl('path', {
+            class: 'pour-stream-shade',
+            d: cubicPath,
+        }));
+        streamGroup.appendChild(makeSvgEl('path', {
+            class: 'pour-stream-ribbon',
+            d: ribbonD,
+            fill: `url(#${gradientId})`,
+        }));
+        streamGroup.appendChild(makeSvgEl('path', {
+            class: 'pour-stream-highlight',
+            d: cubicPath,
+        }));
+        streamGroup.appendChild(makeSvgEl('ellipse', {
+            class: 'pour-stream-pool',
+            cx: openX,
+            cy: openY + 1.5,
+            rx: 6,
+            ry: 2.1,
+        }));
+        if (flowLen > 38) {
+            [0.34, 0.58, 0.78].forEach((t, i) => {
+                const point = pointAt(t);
+                const normal = normalAt(t);
+                const offset = (i % 2 === 0 ? 1 : -1) * (3.4 + i * 0.45);
+                const droplet = makeSvgEl('circle', {
+                    class: 'pour-droplet',
+                    cx: (point.x + normal.x * offset).toFixed(2),
+                    cy: (point.y + normal.y * offset).toFixed(2),
+                    r: (1.45 + i * 0.18).toFixed(2),
+                });
+                droplet.style.animationDelay = `${i * -0.13}s`;
+                streamGroup.appendChild(droplet);
+            });
+        }
+        svg.appendChild(streamGroup);
         overlay.appendChild(svg);
         overlay.style.zIndex = '150';
         grid.appendChild(overlay);
@@ -425,7 +550,7 @@ class BottleSortGame {
         await this.wait(pourCount * layerStep + 320);
 
         // Stream fades, then bottle untilts.
-        path.classList.add('fading');
+        streamGroup.classList.add('fading');
         await this.wait(180);
 
         source.style.transform = '';

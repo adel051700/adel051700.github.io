@@ -420,21 +420,21 @@ body {
     overflow: visible;
 }
 
-.pour-stream-path {
-    fill: none;
-    stroke-width: 7;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+.pour-stream {
+    --stream-main: #e63946;
+    --stream-light: #ff9b9b;
+    --stream-dark: #9f171d;
+    --stream-glow: rgba(230, 57, 70, 0.58);
     opacity: 0;
     animation: streamIn 0.18s ease-out forwards;
 }
 
 @keyframes streamIn {
     from { opacity: 0; }
-    to   { opacity: 0.95; }
+    to   { opacity: 1; }
 }
 
-.pour-stream-path.fading {
+.pour-stream.fading {
     animation: streamOut 0.18s ease-in forwards;
 }
 
@@ -442,14 +442,75 @@ body {
     to { opacity: 0; }
 }
 
-.pour-stream-path.color-red    { stroke: #e63946; filter: drop-shadow(0 0 7px rgba(230, 57, 70, 0.65)); }
-.pour-stream-path.color-blue   { stroke: #2874a6; filter: drop-shadow(0 0 7px rgba(40, 116, 166, 0.65)); }
-.pour-stream-path.color-green  { stroke: #229954; filter: drop-shadow(0 0 7px rgba(34, 153, 84, 0.65)); }
-.pour-stream-path.color-yellow { stroke: #f4a300; filter: drop-shadow(0 0 7px rgba(244, 163, 0, 0.65)); }
-.pour-stream-path.color-purple { stroke: #884ea0; filter: drop-shadow(0 0 7px rgba(136, 78, 160, 0.65)); }
-.pour-stream-path.color-orange { stroke: #f5760a; filter: drop-shadow(0 0 7px rgba(245, 118, 10, 0.65)); }
-.pour-stream-path.color-pink   { stroke: #d63384; filter: drop-shadow(0 0 7px rgba(214, 51, 132, 0.65)); }
-.pour-stream-path.color-cyan   { stroke: #17a589; filter: drop-shadow(0 0 7px rgba(23, 165, 137, 0.65)); }
+.pour-stream-ribbon {
+    filter:
+        drop-shadow(0 2px 1px rgba(0, 0, 0, 0.22))
+        drop-shadow(0 0 8px var(--stream-glow));
+}
+
+.pour-stream-shade {
+    fill: none;
+    stroke: var(--stream-dark);
+    stroke-width: 11;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.22;
+    transform: translateY(1.7px);
+}
+
+.pour-stream-highlight {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.62);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 18 34;
+    opacity: 0.68;
+    mix-blend-mode: screen;
+    animation: streamGlint 0.52s linear infinite;
+}
+
+@keyframes streamGlint {
+    to { stroke-dashoffset: -52; }
+}
+
+.pour-stream-pool,
+.pour-droplet {
+    fill: var(--stream-light);
+    filter: drop-shadow(0 0 6px var(--stream-glow));
+}
+
+.pour-stream-pool {
+    opacity: 0.48;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: pourPoolPulse 0.42s ease-in-out infinite alternate;
+}
+
+@keyframes pourPoolPulse {
+    to {
+        opacity: 0.58;
+        transform: scaleX(1.08);
+    }
+}
+
+.pour-droplet {
+    opacity: 0.24;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: pourDropletPulse 0.48s ease-in-out infinite;
+}
+
+@keyframes pourDropletPulse {
+    45% {
+        opacity: 0.92;
+        transform: translateY(2px) scale(1.16);
+    }
+    100% {
+        opacity: 0.18;
+        transform: translateY(4px) scale(0.72);
+    }
+}
 
 .face-layer.draining {
     transform-origin: 50% 100%;
