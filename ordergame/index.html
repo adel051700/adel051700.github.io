@@ -27,15 +27,6 @@
                 <stop offset="92%"  stop-color="#000" stop-opacity="0.28"/>
                 <stop offset="100%" stop-color="#000" stop-opacity="0.55"/>
             </linearGradient>
-            <linearGradient id="neck-shade" x1="0%" x2="100%" y1="0%" y2="0%">
-                <stop offset="0%"   stop-color="#000" stop-opacity="0.5"/>
-                <stop offset="14%"  stop-color="#000" stop-opacity="0.18"/>
-                <stop offset="32%"  stop-color="#000" stop-opacity="0.04"/>
-                <stop offset="50%"  stop-color="#fff" stop-opacity="0.12"/>
-                <stop offset="68%"  stop-color="#000" stop-opacity="0.04"/>
-                <stop offset="86%"  stop-color="#000" stop-opacity="0.18"/>
-                <stop offset="100%" stop-color="#000" stop-opacity="0.5"/>
-            </linearGradient>
 
             <!-- Glass tint — default fill for body/shoulder/neck (empty bottle look) -->
             <linearGradient id="glass-tint" x1="0%" x2="0%" y1="0%" y2="100%">
@@ -70,26 +61,45 @@
                 <stop offset="0%" stop-color="#82dfd2"/><stop offset="45%" stop-color="#17a589"/><stop offset="100%" stop-color="#0b4f4a"/>
             </linearGradient>
 
-            <!-- Body interior clip — keeps liquid inside the cylinder silhouette,
-                 including the curved bottom. -->
+            <!-- Inner column clip — keeps liquid inside the open cylinder: an
+                 elliptical mouth (cy=22) at the top, vertical walls, and an
+                 elliptical base (cy=148). rx=35, foreshortened ry=9.7. -->
             <clipPath id="body-clip">
-                <path d="M 7.5 35.2 L 7.5 138.75 A 42.5 21.25 0 0 0 92.5 138.75 L 92.5 35.2 Z"/>
+                <path d="M 15 22 A 35 9.7 0 0 1 85 22 L 85 148 A 35 9.7 0 0 1 15 148 Z"/>
             </clipPath>
 
-            <!-- Hidden-layer striped pattern -->
-            <pattern id="hidden-pattern" patternUnits="userSpaceOnUse" width="12" height="12" patternTransform="rotate(45)">
-                <rect width="6" height="12" fill="#3a3a48"/>
-                <rect x="6" width="6" height="12" fill="#4a4a58"/>
-            </pattern>
+            <!-- Dark interior — the shadowed inside of an empty jar (rounded
+                 across like a tube: dark edges, charcoal centre). -->
+            <linearGradient id="interior-shade" x1="0%" x2="100%" y1="0%" y2="0%">
+                <stop offset="0%"   stop-color="#1d1d26"/>
+                <stop offset="16%"  stop-color="#33333f"/>
+                <stop offset="50%"  stop-color="#40404d"/>
+                <stop offset="84%"  stop-color="#33333f"/>
+                <stop offset="100%" stop-color="#1d1d26"/>
+            </linearGradient>
 
-            <!-- Dark elliptical opening at the top of the neck -->
-            <radialGradient id="top-cap-grad" cx="50%" cy="50%" r="50%">
-                <stop offset="0%"   stop-color="#06080F" stop-opacity="0.98"/>
-                <stop offset="45%"  stop-color="#141824" stop-opacity="0.90"/>
-                <stop offset="80%"  stop-color="#2d374b" stop-opacity="0.65"/>
-                <stop offset="95%"  stop-color="#5a6982" stop-opacity="0.25"/>
-                <stop offset="100%" stop-color="#5a6982" stop-opacity="0"/>
+            <!-- Glossy highlight on a liquid disc surface (maps to each ellipse). -->
+            <radialGradient id="disc-sheen" cx="50%" cy="38%" r="62%">
+                <stop offset="0%"   stop-color="#fff" stop-opacity="0.55"/>
+                <stop offset="55%"  stop-color="#fff" stop-opacity="0.14"/>
+                <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
             </radialGradient>
+
+            <!-- Glass lip ring around the mouth. -->
+            <linearGradient id="rim-light" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%"   stop-color="#eef4fb" stop-opacity="0.95"/>
+                <stop offset="50%"  stop-color="#c2d4e8" stop-opacity="0.55"/>
+                <stop offset="100%" stop-color="#90a6c0" stop-opacity="0.8"/>
+            </linearGradient>
+
+            <!-- Vertical specular gloss down the front of the glass. -->
+            <linearGradient id="gloss-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%"   stop-color="#fff" stop-opacity="0"/>
+                <stop offset="28%"  stop-color="#fff" stop-opacity="0.38"/>
+                <stop offset="70%"  stop-color="#fff" stop-opacity="0.12"/>
+                <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+            </linearGradient>
+
         </defs>
     </svg>
 

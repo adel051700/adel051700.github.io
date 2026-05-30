@@ -404,10 +404,7 @@ class BottleSortGame {
         const toBottle = this.bottles[toIndex];
         const sourceFaceLayers = source.querySelectorAll('.face-layers');
         const targetFaceLayers = target.querySelectorAll('.face-layers');
-        const sourceCaps = source.querySelectorAll('.bottle-shoulder-color, .bottle-neck-color');
-        const targetCaps = target.querySelectorAll('.bottle-shoulder-color, .bottle-neck-color');
         const colorClass = this.colors[colorIdx].class;
-        const topPos = this.bottleCapacity - 1;
         const layerStep = 130;
 
         for (let i = 0; i < pourCount; i++) {
@@ -420,16 +417,8 @@ class BottleSortGame {
                 });
                 targetFaceLayers.forEach(fl => {
                     const layer = fl.children[tgtLayerIdx];
-                    if (layer) layer.classList.add('incoming', colorClass);
+                    if (layer) layer.classList.add('incoming', 'filled', colorClass);
                 });
-                // When the layer being drained/filled is the topmost slot, the
-                // shoulder + neck visible color changes too — fade them in sync.
-                if (srcLayerIdx === topPos) {
-                    sourceCaps.forEach(c => c.classList.add('draining'));
-                }
-                if (tgtLayerIdx === topPos) {
-                    targetCaps.forEach(c => c.classList.add('incoming', colorClass));
-                }
             }, i * layerStep);
         }
 
@@ -588,8 +577,8 @@ class BottleSortGame {
         if (!grid) return;
 
         // Build the bottle SVGs once; subsequent renders just toggle classes
-        // and update meniscus/hidden marks. Full rebuild only when the bottle
-        // count changes (level transition).
+        // and update the surface sheen/hidden marks. Full rebuild only when the
+        // bottle count changes (level transition).
         if (!this._bottleEls || this._bottleEls.length !== this.bottles.length) {
             this._rebuildBottleDom();
         }
@@ -607,24 +596,21 @@ class BottleSortGame {
         this._bottleEls = [];
         this._bottleRefs = [];
 
-        // SVG geometry (viewBox 0 0 100 160):
-        //   Body: x∈[7.5, 92.5], straight sides y∈[35.2, 138.75], elliptical
-        //         bottom arc (rx=42.5, ry=21.25) sweeping down to y=160.
-        //   Shoulder: trapezoid from body top (35.2) up to neck (y=12.8),
-        //             narrowing from x=[7.5,92.5] to x=[34.3,65.7].
-        //   Neck: rectangle x∈[34.3,65.7], y∈[7.85,12.8].
-        //   Top opening: ellipse at (50, 7.85), rx=15.7, ry=7.85 (30° tilt).
-        const BODY_X1 = 7.5, BODY_X2 = 92.5, BODY_Y_TOP = 35.2;
-        const BODY_Y_FLAT_BOTTOM = 138.75, BODY_Y_DEEP = 160;
-        const BODY_R = 42.5, BODY_RY = 21.25;
-        const NECK_X1 = 34.3, NECK_X2 = 65.7;
-        const NECK_Y_TOP = 7.85, NECK_Y_BOTTOM = 12.8;
-        const NECK_RX = 15.7, NECK_RY = 7.85;
-        const LAYER_H = (BODY_Y_DEEP - BODY_Y_TOP) / this.bottleCapacity;
+        // Open cylindrical jar viewed slightly from above (viewBox 0 0 100 160).
+        //   Outer glass: rx=38, foreshortened ry=10.5; mouth ellipse centred at
+        //   y=22, base ellipse centred at y=148. Liquid fills the inner column
+        //   (rx=35) from the base up. Each liquid layer is a cylinder *slice*
+        //   capped by an ellipse, so colour boundaries read as curved discs —
+        //   that's where the depth comes from. No 3D transforms (fast on iOS).
+        const CX = 50, RX = 38, RY = 10.5;
+        const RXI = 35, RYI = 9.7;
+        const TOP_CY = 22, BOT_CY = 148;
+        const LAYER_H = (BOT_CY - TOP_CY) / this.bottleCapacity;
 
-        const bodyPath = `M ${BODY_X1} ${BODY_Y_TOP} L ${BODY_X1} ${BODY_Y_FLAT_BOTTOM} A ${BODY_R} ${BODY_RY} 0 0 0 ${BODY_X2} ${BODY_Y_FLAT_BOTTOM} L ${BODY_X2} ${BODY_Y_TOP} Z`;
-        const shoulderPath = `M ${BODY_X1} ${BODY_Y_TOP} L ${BODY_X2} ${BODY_Y_TOP} L ${NECK_X2} ${NECK_Y_BOTTOM} L ${NECK_X1} ${NECK_Y_BOTTOM} Z`;
-        const neckPath = `M ${NECK_X1} ${NECK_Y_TOP} L ${NECK_X2} ${NECK_Y_TOP} L ${NECK_X2} ${NECK_Y_BOTTOM} L ${NECK_X1} ${NECK_Y_BOTTOM} Z`;
+        // Outer silhouette: back-top arc → right wall → front-bottom arc → left wall.
+        const bodyPath =
+            `M ${CX - RX} ${TOP_CY} A ${RX} ${RY} 0 0 1 ${CX + RX} ${TOP_CY}` +
+            ` L ${CX + RX} ${BOT_CY} A ${RX} ${RY} 0 0 1 ${CX - RX} ${BOT_CY} Z`;
 
         const SVG_NS = 'http://www.w3.org/2000/svg';
         const svgEl = (tag, attrs) => {
@@ -643,28 +629,42 @@ class BottleSortGame {
                 preserveAspectRatio: 'xMidYMid meet',
             });
 
-            // Body background (glass tint visible behind any unfilled space).
+            // Glass body tint behind everything.
             svg.appendChild(svgEl('path', { class: 'bottle-body-bg', d: bodyPath }));
 
-            // Liquid layers — one <rect> per capacity slot, clipped to body shape.
-            // Positions index from bottom (0) to top (capacity-1).
+            // Dark interior — the shadowed inside of the jar, visible wherever
+            // there's no liquid (this is the default "empty" look).
+            svg.appendChild(svgEl('rect', {
+                class: 'bottle-interior',
+                x: CX - RXI, y: TOP_CY - RYI,
+                width: RXI * 2, height: (BOT_CY + RYI) - (TOP_CY - RYI),
+                'clip-path': 'url(#body-clip)',
+            }));
+
+            // Liquid layers (bottom→top). Each slot is a <g> holding a curved
+            // wall path plus an elliptical cap, so layer boundaries are rounded.
             const layersGroup = svgEl('g', {
                 class: 'face-layers',
                 'clip-path': 'url(#body-clip)',
             });
             const layerRefsByPos = [];
             for (let pos = 0; pos < this.bottleCapacity; pos++) {
-                const y = BODY_Y_TOP + (this.bottleCapacity - 1 - pos) * LAYER_H;
-                const rect = svgEl('rect', {
-                    class: 'face-layer',
-                    'data-pos': pos,
-                    x: BODY_X1,
-                    y: y,
-                    width: BODY_X2 - BODY_X1,
-                    height: LAYER_H,
-                });
-                layersGroup.appendChild(rect);
-                layerRefsByPos.push([rect]);
+                const topY = BOT_CY - (pos + 1) * LAYER_H; // surface of this slice
+                const bottomY = BOT_CY - pos * LAYER_H;
+                const wallPath =
+                    `M ${CX - RXI} ${topY} L ${CX + RXI} ${topY}` +
+                    ` L ${CX + RXI} ${bottomY}` +
+                    ` A ${RXI} ${RYI} 0 0 1 ${CX - RXI} ${bottomY} Z`;
+                const g = svgEl('g', { class: 'face-layer', 'data-pos': pos });
+                g.appendChild(svgEl('path', {
+                    class: 'layer-wall',
+                    d: wallPath,
+                }));
+                g.appendChild(svgEl('ellipse', {
+                    class: 'layer-cap', cx: CX, cy: topY, rx: RXI, ry: RYI,
+                }));
+                layersGroup.appendChild(g);
+                layerRefsByPos.push([g]);
             }
             svg.appendChild(layersGroup);
 
@@ -675,12 +675,11 @@ class BottleSortGame {
             });
             const hiddenMarksByPos = [];
             for (let pos = 0; pos < this.bottleCapacity; pos++) {
-                const y = BODY_Y_TOP + (this.bottleCapacity - 1 - pos) * LAYER_H + LAYER_H / 2;
+                const y = BOT_CY - pos * LAYER_H - LAYER_H / 2;
                 const text = svgEl('text', {
                     class: 'hidden-mark',
                     'data-pos': pos,
-                    x: 50,
-                    y: y,
+                    x: CX, y: y,
                     'text-anchor': 'middle',
                     'dominant-baseline': 'central',
                 });
@@ -690,64 +689,38 @@ class BottleSortGame {
             }
             svg.appendChild(hiddenGroup);
 
-            // Meniscus — bright ellipse at the top of the topmost liquid layer.
-            const meniscus = svgEl('ellipse', {
-                class: 'bottle-meniscus',
-                cx: 50,
-                cy: BODY_Y_TOP,
-                rx: BODY_R,
-                ry: 2.2,
-            });
-            svg.appendChild(meniscus);
-
-            // Cylinder shading overlay on the body — sits above liquid + meniscus.
+            // Cylinder edge shading over the liquid — rounds the tube.
             svg.appendChild(svgEl('rect', {
                 class: 'bottle-body-shade',
-                x: BODY_X1,
-                y: BODY_Y_TOP,
-                width: BODY_X2 - BODY_X1,
-                height: BODY_Y_DEEP - BODY_Y_TOP,
+                x: CX - RX, y: TOP_CY - RY,
+                width: RX * 2, height: (BOT_CY + RY) - (TOP_CY - RY),
                 'clip-path': 'url(#body-clip)',
                 'pointer-events': 'none',
             }));
 
-            // Shoulder — three stacked paths (glass tint → color overlay → shading).
-            // The color overlay is what holds the liquid color when the bottle is
-            // full; its opacity animates during a pour to drain/fill the cap.
-            svg.appendChild(svgEl('path', { class: 'bottle-shoulder', d: shoulderPath }));
-            const shoulderColor = svgEl('path', {
-                class: 'bottle-shoulder-color',
-                d: shoulderPath,
+            // Glossy sheen on the topmost liquid surface (JS moves it to the level).
+            const sheen = svgEl('ellipse', {
+                class: 'bottle-sheen',
+                cx: CX, cy: TOP_CY, rx: RXI * 0.82, ry: RYI * 0.72,
+                'clip-path': 'url(#body-clip)',
                 'pointer-events': 'none',
             });
-            svg.appendChild(shoulderColor);
-            svg.appendChild(svgEl('path', {
-                class: 'bottle-shoulder-shade',
-                d: shoulderPath,
-                'pointer-events': 'none',
-            }));
+            svg.appendChild(sheen);
 
-            // Neck — same three-stack treatment.
-            svg.appendChild(svgEl('path', { class: 'bottle-neck', d: neckPath }));
-            const neckColor = svgEl('path', {
-                class: 'bottle-neck-color',
-                d: neckPath,
-                'pointer-events': 'none',
-            });
-            svg.appendChild(neckColor);
-            svg.appendChild(svgEl('path', {
-                class: 'bottle-neck-shade',
-                d: neckPath,
-                'pointer-events': 'none',
-            }));
-
-            // Top opening — foreshortened dark ellipse reads as the rim hole.
+            // Open mouth — a glass lip ring drawn as a stroked ellipse so the
+            // hole stays see-through (liquid surface or dark interior shows through).
             svg.appendChild(svgEl('ellipse', {
-                class: 'bottle-top-cap',
-                cx: 50,
-                cy: NECK_Y_TOP,
-                rx: NECK_RX,
-                ry: NECK_RY,
+                class: 'bottle-rim',
+                cx: CX, cy: TOP_CY, rx: (RX + RXI) / 2, ry: (RY + RYI) / 2,
+                'pointer-events': 'none',
+            }));
+
+            // Vertical specular gloss down the front-left of the glass.
+            svg.appendChild(svgEl('ellipse', {
+                class: 'bottle-gloss',
+                cx: CX - RX * 0.5, cy: (TOP_CY + BOT_CY) / 2,
+                rx: 5.5, ry: (BOT_CY - TOP_CY) * 0.34,
+                'pointer-events': 'none',
             }));
 
             bottleElement.appendChild(svg);
@@ -764,13 +737,8 @@ class BottleSortGame {
             this._bottleRefs.push({
                 layerRefsByPos,
                 hiddenMarksByPos,
-                meniscus,
-                // shoulderFaces/neckFaces point at the color-overlay path. The
-                // glass-tint base is static and never gets colored, so applying
-                // a color class to the overlay is what makes the cap "fill in".
-                shoulderFaces: [shoulderColor],
-                neckFaces: [neckColor],
-                layerTopY: BODY_Y_TOP,
+                sheen,
+                layerBotY: BOT_CY,
                 layerH: LAYER_H,
             });
         }
@@ -789,11 +757,6 @@ class BottleSortGame {
         bottleElement.classList.toggle('locked', isSealed);
         bottleElement.classList.toggle('sorted', isSorted);
 
-        const topIdx = bottle.length - 1;
-        const topColorClass = (isFull && !this.isPositionHidden(index, topIdx))
-            ? this.colors[bottle[topIdx]].class
-            : null;
-
         // Reusable list of every color class we might have applied previously,
         // so we can clean stale ones before reapplying the current color.
         if (!this._allColorClasses) {
@@ -801,56 +764,42 @@ class BottleSortGame {
         }
         const allColors = this._allColorClasses;
 
-        // Track the position of the topmost visible (non-hidden) liquid layer
-        // so we can park the meniscus there.
+        // Track the topmost visible (non-hidden) liquid layer so we can park the
+        // glossy surface sheen at its level.
         let topVisiblePos = -1;
 
         for (let pos = 0; pos < this.bottleCapacity; pos++) {
             let colorClass = null;
             let isHidden = false;
-            let isTop = false;
             if (pos < bottle.length) {
                 if (this.isPositionHidden(index, pos)) {
                     isHidden = true;
                 } else {
                     colorClass = this.colors[bottle[pos]].class;
-                    isTop = (pos === bottle.length - 1);
-                    if (isTop) topVisiblePos = pos;
+                    topVisiblePos = pos;
                 }
             }
             for (const layer of refs.layerRefsByPos[pos]) {
                 for (const c of allColors) layer.classList.remove(c);
                 // Animation classes from a previous pour must be cleared too,
                 // otherwise the layer would stay at scaleY(0) or animate again.
-                layer.classList.remove('hidden-layer', 'top-layer', 'draining', 'incoming');
+                layer.classList.remove('hidden-layer', 'filled', 'draining', 'incoming');
                 if (isHidden) layer.classList.add('hidden-layer');
-                if (colorClass) layer.classList.add(colorClass);
-                if (isTop) layer.classList.add('top-layer');
+                if (colorClass) layer.classList.add(colorClass, 'filled');
             }
             const mark = refs.hiddenMarksByPos[pos];
             if (mark) mark.classList.toggle('active', isHidden);
         }
 
-        // Meniscus sits at the top edge of the topmost visible liquid layer.
-        if (refs.meniscus) {
+        // Sheen sits on the surface of the topmost visible liquid layer.
+        if (refs.sheen) {
             if (topVisiblePos >= 0) {
-                const topY = refs.layerTopY + (this.bottleCapacity - 1 - topVisiblePos) * refs.layerH;
-                refs.meniscus.setAttribute('cy', topY);
-                refs.meniscus.classList.add('active');
+                const topY = refs.layerBotY - (topVisiblePos + 1) * refs.layerH;
+                refs.sheen.setAttribute('cy', topY);
+                refs.sheen.classList.add('active');
             } else {
-                refs.meniscus.classList.remove('active');
+                refs.sheen.classList.remove('active');
             }
-        }
-
-        for (const face of refs.shoulderFaces) {
-            for (const c of allColors) face.classList.remove(c);
-            face.classList.remove('draining', 'incoming');
-            if (topColorClass) face.classList.add(topColorClass);
-        }
-        for (const face of refs.neckFaces) {
-            for (const c of allColors) face.classList.remove(c);
-            face.classList.remove('draining', 'incoming');
-            if (topColorClass) face.classList.add(topColorClass);
         }
     }
 

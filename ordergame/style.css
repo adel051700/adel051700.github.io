@@ -241,13 +241,14 @@ body {
     z-index: 0;
 }
 
-/* Bottle Styling — SVG-rendered cylinder.
-   Each bottle is one <svg> (viewBox 0 0 100 160) containing a body path with
-   an elliptical curved bottom (real cylindrical silhouette), a shoulder
-   trapezoid, a neck rectangle, and a foreshortened ellipse for the top
-   opening. Cylinder shading is a horizontal linearGradient overlay. Liquid
-   layers are <rect>s clipped to the body shape; pour animation scales them
-   on the Y axis. GPU-rasterized, no 3D transforms — fast on iPhone. */
+/* Bottle Styling — SVG-rendered open cylinder viewed slightly from above.
+   Each bottle is one <svg> (viewBox 0 0 100 160): a glass silhouette with an
+   elliptical mouth and base, a dark interior, then liquid layers. Each layer
+   is a cylinder slice (curved wall path + elliptical cap) so colour boundaries
+   read as curved discs — the depth cue. A glossy sheen marks the top surface, a
+   stroked ellipse forms the open rim, and a vertical streak adds glass gloss.
+   Pour animation scales each slice on the Y axis. No 3D transforms — fast on
+   iPhone. */
 
 .bottle {
     aspect-ratio: 0.62;
@@ -285,64 +286,40 @@ body {
     overflow: visible;
 }
 
-/* Body silhouette path — fill is the glass tint behind the liquid. */
+/* Glass body tint behind everything. */
 .bottle-body-bg {
     fill: url(#glass-tint);
 }
 
-/* Cylinder shading overlay — horizontal gradient (dark edges → bright center)
-   clipped to the body interior. Sits above the liquid layers. */
+/* Shadowed interior of an empty jar (shows wherever there's no liquid). */
+.bottle-interior {
+    fill: url(#interior-shade);
+}
+
+/* Cylinder edge shading — horizontal gradient (dark edges → bright centre)
+   clipped to the inner column, above the liquid, to round the tube. */
 .bottle-body-shade {
     fill: url(#body-shade);
 }
 
-.bottle-shoulder {
-    fill: url(#glass-tint);
-}
-
-/* Color overlay — sits between the glass-tint shoulder and its shading.
-   Transparent by default; opacity is driven by the liquid color class and
-   the pour drain/fill animation. */
-.bottle-shoulder-color {
-    fill: transparent;
-    opacity: 0;
-    transition: opacity 0.25s ease;
-}
-
-.bottle-shoulder-shade {
-    fill: url(#body-shade);
-}
-
-.bottle-neck {
-    fill: url(#glass-tint);
-}
-
-.bottle-neck-color {
-    fill: transparent;
-    opacity: 0;
-    transition: opacity 0.25s ease;
-}
-
-.bottle-neck-shade {
-    fill: url(#neck-shade);
-}
-
-/* Top opening — foreshortened ellipse with a radial-gradient dark fill
-   reading as a circular hole viewed from above. */
-.bottle-top-cap {
-    fill: url(#top-cap-grad);
-}
-
-/* Liquid layers — <rect>s inside .face-layers (clipped to body interior). */
+/* Liquid layer group — a curved wall path + an elliptical cap.
+   scaleY anchored at the slice bottom drives the pour drain/fill. */
 .face-layer {
-    fill: rgba(255, 255, 255, 0.04);
     transform-box: fill-box;
     transform-origin: 50% 100%;
+}
+
+/* Default (empty / hidden) — transparent so the dark interior shows through. */
+.layer-wall,
+.layer-cap {
+    fill: transparent;
     transition: fill 0.3s ease;
 }
 
-.face-layer.hidden-layer {
-    fill: url(#hidden-pattern);
+/* A lit rim on each filled disc makes the colour boundaries read as 3D discs. */
+.face-layer.filled .layer-cap {
+    stroke: rgba(255, 255, 255, 0.28);
+    stroke-width: 0.8;
 }
 
 /* "?" marker for sealed (hidden) layers. One <text> per slot, JS toggles
@@ -360,16 +337,28 @@ body {
     display: block;
 }
 
-/* Meniscus — bright elliptical strip at the top of the current liquid level.
-   JS sets `cy` to the top of the highest filled layer and toggles `.active`. */
-.bottle-meniscus {
-    fill: rgba(255, 255, 255, 0.55);
+/* Glossy sheen on the topmost liquid surface. JS sets `cy` and toggles `.active`. */
+.bottle-sheen {
+    fill: url(#disc-sheen);
     pointer-events: none;
     display: none;
 }
 
-.bottle-meniscus.active {
+.bottle-sheen.active {
     display: block;
+}
+
+/* Open mouth — a glass lip ring (stroked so the hole stays see-through). */
+.bottle-rim {
+    fill: none;
+    stroke: url(#rim-light);
+    stroke-width: 3;
+}
+
+/* Vertical specular gloss down the front of the glass. */
+.bottle-gloss {
+    fill: url(#gloss-grad);
+    pointer-events: none;
 }
 
 /* Sorted check overlay. Sibling of the SVG, sits on top in 2D. */
@@ -482,54 +471,16 @@ body {
     to   { transform: scaleY(1); }
 }
 
-/* Locked bottle — dim and desaturate the whole SVG so it reads as inert. */
-.bottle.locked .bottle-svg {
-    filter: brightness(0.78) saturate(0.7);
-}
-
-/* Liquid colors — applied to <rect class="face-layer"> via SVG fill. Gradients
-   are defined in the shared <defs> in index.html so all bottles share them. */
-.face-layer.color-red    { fill: url(#liquid-red); }
-.face-layer.color-blue   { fill: url(#liquid-blue); }
-.face-layer.color-green  { fill: url(#liquid-green); }
-.face-layer.color-yellow { fill: url(#liquid-yellow); }
-.face-layer.color-purple { fill: url(#liquid-purple); }
-.face-layer.color-orange { fill: url(#liquid-orange); }
-.face-layer.color-pink   { fill: url(#liquid-pink); }
-.face-layer.color-cyan   { fill: url(#liquid-cyan); }
-
-/* Shoulder + neck color overlays — opacity goes to 1 when a color is applied,
-   so the cap visually "fills" with the top liquid color. The pour animation
-   transitions through draining/incoming keyframes (below) instead. */
-.bottle-shoulder-color.color-red,    .bottle-neck-color.color-red    { fill: url(#liquid-red);    opacity: 1; }
-.bottle-shoulder-color.color-blue,   .bottle-neck-color.color-blue   { fill: url(#liquid-blue);   opacity: 1; }
-.bottle-shoulder-color.color-green,  .bottle-neck-color.color-green  { fill: url(#liquid-green);  opacity: 1; }
-.bottle-shoulder-color.color-yellow, .bottle-neck-color.color-yellow { fill: url(#liquid-yellow); opacity: 1; }
-.bottle-shoulder-color.color-purple, .bottle-neck-color.color-purple { fill: url(#liquid-purple); opacity: 1; }
-.bottle-shoulder-color.color-orange, .bottle-neck-color.color-orange { fill: url(#liquid-orange); opacity: 1; }
-.bottle-shoulder-color.color-pink,   .bottle-neck-color.color-pink   { fill: url(#liquid-pink);   opacity: 1; }
-.bottle-shoulder-color.color-cyan,   .bottle-neck-color.color-cyan   { fill: url(#liquid-cyan);   opacity: 1; }
-
-/* Synchronized with the layer drain/fill animation — same 0.34s timing. */
-.bottle-shoulder-color.draining,
-.bottle-neck-color.draining {
-    animation: capDrain 0.34s ease-in forwards;
-}
-
-@keyframes capDrain {
-    from { opacity: 1; }
-    to   { opacity: 0; }
-}
-
-.bottle-shoulder-color.incoming,
-.bottle-neck-color.incoming {
-    animation: capFill 0.34s ease-out forwards;
-}
-
-@keyframes capFill {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
+/* Liquid colors — applied to the layer group; the wall and cap share the same
+   gradient. Gradients live in the shared <defs> in index.html. */
+.face-layer.color-red    .layer-wall, .face-layer.color-red    .layer-cap { fill: url(#liquid-red); }
+.face-layer.color-blue   .layer-wall, .face-layer.color-blue   .layer-cap { fill: url(#liquid-blue); }
+.face-layer.color-green  .layer-wall, .face-layer.color-green  .layer-cap { fill: url(#liquid-green); }
+.face-layer.color-yellow .layer-wall, .face-layer.color-yellow .layer-cap { fill: url(#liquid-yellow); }
+.face-layer.color-purple .layer-wall, .face-layer.color-purple .layer-cap { fill: url(#liquid-purple); }
+.face-layer.color-orange .layer-wall, .face-layer.color-orange .layer-cap { fill: url(#liquid-orange); }
+.face-layer.color-pink   .layer-wall, .face-layer.color-pink   .layer-cap { fill: url(#liquid-pink); }
+.face-layer.color-cyan   .layer-wall, .face-layer.color-cyan   .layer-cap { fill: url(#liquid-cyan); }
 
 
 .game-footer {
@@ -860,4 +811,3 @@ body {
         width: 100%;
     }
 }
-
