@@ -55,15 +55,140 @@
             text-decoration: underline;
         }
 
+        .page-shell {
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+            max-width: 1320px;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .git-log-panel {
+            align-self: stretch;
+            height: min(680px, calc(100vh - 8rem));
+            min-height: 0;
+            background: #1d2230;
+            border: 1px solid #353d52;
+            border-radius: 8px;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.22);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .git-log-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .git-log-header h2 {
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .git-log-header a {
+            color: #7dd3fc;
+            text-decoration: none;
+            font-size: 0.78rem;
+        }
+
+        .git-log-header a:hover {
+            color: #38bdf8;
+            text-decoration: underline;
+        }
+
+        .git-log-list {
+            list-style: none;
+            min-height: 0;
+            overflow-y: auto;
+            padding-right: 0.35rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            scrollbar-color: #4c566f #171b25;
+            scrollbar-width: thin;
+        }
+
+        .git-log-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .git-log-list::-webkit-scrollbar-track {
+            background: #171b25;
+            border-radius: 999px;
+        }
+
+        .git-log-list::-webkit-scrollbar-thumb {
+            background: #4c566f;
+            border-radius: 999px;
+        }
+
+        .git-log-item {
+            border-left: 2px solid #f59e0b;
+            background: #232834;
+            border-radius: 6px;
+        }
+
+        .git-log-link {
+            color: inherit;
+            display: block;
+            padding: 0.8rem;
+            text-decoration: none;
+        }
+
+        .git-log-link:hover .commit-message {
+            color: #fff;
+        }
+
+        .commit-message {
+            color: #d6dde8;
+            display: block;
+            font-size: 0.86rem;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
+        .commit-meta {
+            color: #8d96aa;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            margin-top: 0.55rem;
+            font-size: 0.72rem;
+            line-height: 1.4;
+        }
+
+        .commit-hash {
+            color: #fbbf24;
+        }
+
+        .git-log-empty {
+            color: #b0b8c9;
+            font-size: 0.86rem;
+            line-height: 1.5;
+            padding: 0.8rem;
+            background: #232834;
+            border-radius: 6px;
+        }
+
         .emulator-wrapper {
             flex: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 2rem;
             width: 100%;
             max-width: 1000px;
+            min-width: 0;
         }
 
         .emulator-wrapper p {
@@ -151,6 +276,42 @@
             color: #b0b8c9;
             font-size: 0.95rem;
         }
+
+        @media (max-width: 1100px) {
+            .page-shell {
+                grid-template-columns: 1fr;
+                align-items: stretch;
+            }
+
+            .git-log-panel {
+                height: auto;
+                max-height: 320px;
+            }
+        }
+
+        @media (max-width: 700px) {
+            header {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 0.75rem;
+                padding: 1rem;
+            }
+
+            .page-shell {
+                padding: 1rem;
+                gap: 1.25rem;
+            }
+
+            #screen_container {
+                transform: none;
+            }
+
+            .controls,
+            .links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
     </style>
 </head>
 <body>
@@ -159,33 +320,45 @@
         <a href="../">&larr; Back to Portfolio</a>
     </header>
 
-    <div class="emulator-wrapper">
-        <p>
-            A hobby operating system built from scratch.<br>
-            Click <strong>Start</strong> to boot DeanOS in your browser using the
-            <a href="https://github.com/TheEvalon/x86" target="_blank">v86</a> x86 emulator.
-        </p>
+    <div class="page-shell">
+        <aside class="git-log-panel" aria-labelledby="git-log-title">
+            <div class="git-log-header">
+                <h2 id="git-log-title">Git Log</h2>
+                <a href="https://github.com/adel051700/deanos/commits" target="_blank" rel="noopener">GitHub</a>
+            </div>
+            <ol id="git-log-list" class="git-log-list" aria-live="polite">
+                <li class="git-log-empty">Loading commits...</li>
+            </ol>
+        </aside>
 
-        <div id="screen_container" tabindex="0">
-            <div style="white-space: pre; font: 14px monospace; line-height: 14px; color: #c0c0c0; padding: 20px;">
+        <div class="emulator-wrapper">
+            <p>
+                A hobby operating system built from scratch.<br>
+                Click <strong>Start</strong> to boot DeanOS in your browser using the
+                <a href="https://github.com/TheEvalon/x86" target="_blank">v86</a> x86 emulator.
+            </p>
+
+            <div id="screen_container" tabindex="0">
+                <div style="white-space: pre; font: 14px monospace; line-height: 14px; color: #c0c0c0; padding: 20px;">
 V86 Emulator Ready
 
 Press Start to boot DeanOS.
+                </div>
+                <canvas style="display: none"></canvas>
             </div>
-            <canvas style="display: none"></canvas>
-        </div>
 
-        <div class="controls">
-            <button id="start-btn">▶ Start</button>
-            <button id="restart-btn" disabled>↻ Restart</button>
-        </div>
+            <div class="controls">
+                <button id="start-btn">▶ Start</button>
+                <button id="restart-btn" disabled>↻ Restart</button>
+            </div>
 
-        <div id="status">Ready</div>
+            <div id="status">Ready</div>
 
-        <div class="links">
-            <span id="version-label" class="version-label">Version loading...</span>
-            <a id="download-btn" href="deanos.iso" target="_blank" rel="noopener">Download Latest ISO</a>
-            <a href="https://github.com/adel051700/deanos" target="_blank">View Source on GitHub</a>
+            <div class="links">
+                <span id="version-label" class="version-label">Version loading...</span>
+                <a id="download-btn" href="deanos.iso" target="_blank" rel="noopener">Download Latest ISO</a>
+                <a href="https://github.com/adel051700/deanos" target="_blank">View Source on GitHub</a>
+            </div>
         </div>
     </div>
 
@@ -197,10 +370,12 @@ Press Start to boot DeanOS.
         const status     = document.getElementById("status");
         const downloadBtn = document.getElementById("download-btn");
         const versionLabel = document.getElementById("version-label");
+        const gitLogList = document.getElementById("git-log-list");
 
         // Public Supabase URL + anon key are safe for frontend use with proper RLS.
         const SUPABASE_URL = "https://caimogubvdogzubilvfy.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNhaW1vZ3VidmRvZ3p1YmlsdmZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjczNzkyNDUsImV4cCI6MjA4Mjk1NTI0NX0.eBddkUffZzNeV5cZokDODmKcxHq-j5fmIOfvqje1RFI";
+        const GITHUB_COMMITS_URL = "https://api.github.com/repos/adel051700/deanos/commits?per_page=30";
 
         let currentIsoUrl = "deanos.iso";
         const hdaCandidates = ["deanos.img", "../deanos.img"];
@@ -254,6 +429,89 @@ Press Start to boot DeanOS.
             }
 
             return null;
+        }
+
+        function formatCommitDate(value) {
+            const date = new Date(value);
+
+            if (Number.isNaN(date.getTime())) {
+                return "Unknown date";
+            }
+
+            return date.toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+            });
+        }
+
+        function createCommitItem(commit) {
+            const commitData = commit.commit || {};
+            const commitAuthor = commitData.author || {};
+            const item = document.createElement("li");
+            item.className = "git-log-item";
+
+            const link = document.createElement("a");
+            link.className = "git-log-link";
+            link.href = commit.html_url || "https://github.com/adel051700/deanos/commits";
+            link.target = "_blank";
+            link.rel = "noopener";
+
+            const message = document.createElement("span");
+            message.className = "commit-message";
+            message.textContent = (commitData.message || "Untitled commit").split("\n")[0];
+
+            const meta = document.createElement("span");
+            meta.className = "commit-meta";
+
+            const hash = document.createElement("span");
+            hash.className = "commit-hash";
+            hash.textContent = (commit.sha || "").slice(0, 7) || "unknown";
+
+            const author = document.createElement("span");
+            author.textContent = commitAuthor.name || "Unknown author";
+
+            const date = document.createElement("span");
+            date.textContent = formatCommitDate(commitAuthor.date);
+
+            meta.append(hash, author, date);
+            link.append(message, meta);
+            item.append(link);
+
+            return item;
+        }
+
+        function setGitLogMessage(message) {
+            const item = document.createElement("li");
+            item.className = "git-log-empty";
+            item.textContent = message;
+            gitLogList.replaceChildren(item);
+        }
+
+        async function getGitLog() {
+            try {
+                const res = await fetch(GITHUB_COMMITS_URL, {
+                    headers: {
+                        Accept: "application/vnd.github+json",
+                    },
+                });
+
+                if (!res.ok) {
+                    throw new Error(`GitHub request failed (${res.status})`);
+                }
+
+                const commits = await res.json();
+
+                if (!Array.isArray(commits) || commits.length === 0) {
+                    setGitLogMessage("No commits found.");
+                    return;
+                }
+
+                gitLogList.replaceChildren(...commits.map(createCommitItem));
+            } catch (err) {
+                console.error("Failed to load git log:", err);
+                setGitLogMessage("Could not load commits. Open GitHub for the full log.");
+            }
         }
 
         function boot() {
@@ -327,7 +585,8 @@ Press Start to boot DeanOS.
                 });
         }
 
-            getLatestISO();
+        getLatestISO();
+        getGitLog();
 
         const screenContainer = document.getElementById("screen_container");
 
