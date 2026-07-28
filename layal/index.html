@@ -36,42 +36,21 @@
 
     .tv {
         width: min(92vw, 720px);
-        background:
-            repeating-linear-gradient(100deg, var(--wood-1) 0 6px, var(--wood-2) 6px 12px);
-        border-radius: 18px;
-        padding: 2.2rem 2.2rem 2.6rem;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.6), inset 0 0 0 2px rgba(0,0,0,0.3);
+        aspect-ratio: 480 / 270;
         position: relative;
+        background: url("tv.png") center / 100% 100% no-repeat;
+        filter: drop-shadow(0 20px 40px rgba(0,0,0,0.6));
     }
 
-    .tv-controls {
-        position: absolute;
-        top: 1.6rem;
-        right: 1.8rem;
-        display: flex;
-        gap: 0.7rem;
-    }
-
-    .knob {
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        background: radial-gradient(circle at 35% 30%, #d8d0c8, #6b6459 70%);
-        box-shadow: 0 2px 3px rgba(0,0,0,0.5);
-    }
-
-    .screen-bezel {
-        background: #1b1310;
-        border-radius: 10px;
-        padding: 1.4rem;
-        box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
-    }
-
+    /* Positioned over the green-screen area of tv.png (480x270 source). */
     .screen {
-        position: relative;
-        aspect-ratio: 4 / 3;
+        position: absolute;
+        left: 10%;
+        top: 4.5%;
+        width: 66%;
+        height: 90%;
+        border-radius: 14% / 11%;
         background: var(--screen-black);
-        border-radius: 6px;
         overflow: hidden;
         color: var(--amber);
     }
@@ -293,9 +272,11 @@
 </style>
 </head>
 <body>
+    <audio id="crtHum" loop preload="none">
+        <source src="audio/crt-hum.mp3" type="audio/mpeg">
+        <source src="audio/crt-hum.ogg" type="audio/ogg">
+    </audio>
     <div class="tv">
-        <div class="tv-controls"><div class="knob"></div><div class="knob"></div></div>
-        <div class="screen-bezel">
             <div class="screen" id="screen">
                 <div class="flicker" id="flicker"></div>
 
@@ -344,7 +325,6 @@
                     <p class="hint">Esc to go back</p>
                 </section>
             </div>
-        </div>
     </div>
 
 <script>
@@ -363,6 +343,7 @@
 
     const views = document.querySelectorAll(".view");
     const flicker = document.getElementById("flicker");
+    const crtHum = document.getElementById("crtHum");
     const viewerStage = document.getElementById("viewerStage");
     const pinDisplay = document.getElementById("pinDisplay");
     const keypad = document.getElementById("keypad");
@@ -396,6 +377,8 @@
     // --- power on ---
     function powerOn() {
         if (state !== "off") return;
+        crtHum.volume = 0.35;
+        crtHum.play().catch(() => {}); // ponytail: silent no-op until audio/crt-hum.* is dropped in
         doFlicker(() => {
             if (localStorage.getItem("layalUnlocked") === "1") {
                 menuSelected = 0;
