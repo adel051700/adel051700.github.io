@@ -272,6 +272,10 @@
 </style>
 </head>
 <body>
+    <audio id="crtStart" preload="none">
+        <source src="audio/crt-start.mp3" type="audio/mpeg">
+        <source src="audio/crt-start.ogg" type="audio/ogg">
+    </audio>
     <audio id="crtHum" loop preload="none">
         <source src="audio/crt-hum.mp3" type="audio/mpeg">
         <source src="audio/crt-hum.ogg" type="audio/ogg">
@@ -344,6 +348,7 @@
     const views = document.querySelectorAll(".view");
     const flicker = document.getElementById("flicker");
     const crtHum = document.getElementById("crtHum");
+    const crtStart = document.getElementById("crtStart");
     const viewerStage = document.getElementById("viewerStage");
     const pinDisplay = document.getElementById("pinDisplay");
     const keypad = document.getElementById("keypad");
@@ -377,8 +382,9 @@
     // --- power on ---
     function powerOn() {
         if (state !== "off") return;
+        crtStart.play().catch(() => {}); // plays once, only on power-on
         crtHum.volume = 0.35;
-        crtHum.play().catch(() => {}); // ponytail: silent no-op until audio/crt-hum.* is dropped in
+        crtHum.play().catch(() => {}); // ponytail: silent no-op until audio files are dropped in
         doFlicker(() => {
             if (localStorage.getItem("layalUnlocked") === "1") {
                 menuSelected = 0;
