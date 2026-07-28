@@ -35,7 +35,7 @@
     }
 
     .tv {
-        width: min(92vw, 720px);
+        width: min(96vw, 1080px);
         aspect-ratio: 480 / 270;
         position: relative;
         background: url("tv.png") center / 100% 100% no-repeat;
@@ -150,6 +150,9 @@
     .keypad button:hover, .keypad button:focus {
         background: rgba(255, 179, 71, 0.25);
         outline: none;
+    }
+    .keypad button.zero {
+        grid-column: 2;
     }
 
     /* DVD-style menu (root year menu + scene grid), modeled after
@@ -410,13 +413,18 @@
     }
     document.getElementById("view-off").addEventListener("click", powerOn);
 
-    // --- pin keypad ---
-    for (let d = 0; d <= 9; d++) {
+    // --- pin keypad --- (1-9 in a 3x3 grid, 0 centered on its own row below)
+    for (let d = 1; d <= 9; d++) {
         const btn = document.createElement("button");
         btn.textContent = d;
         btn.addEventListener("click", () => enterDigit(String(d)));
         keypad.appendChild(btn);
     }
+    const zeroBtn = document.createElement("button");
+    zeroBtn.textContent = "0";
+    zeroBtn.className = "zero";
+    zeroBtn.addEventListener("click", () => enterDigit("0"));
+    keypad.appendChild(zeroBtn);
 
     function enterDigit(digit) {
         if (pinEntered.length >= 4) return;
@@ -572,7 +580,7 @@
     // --- auto-play: after the correct PIN, tour every year/item on its own ---
     function startAutoPlay() {
         autoPlaying = true;
-        const startIdx = YEAR_LIST.indexOf("2014");
+        const startIdx = YEAR_LIST.indexOf("2015");
         introScanStep(startIdx >= 0 ? startIdx : 0);
     }
 
