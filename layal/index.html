@@ -284,9 +284,7 @@
             <div class="screen" id="screen">
                 <div class="flicker" id="flicker"></div>
 
-                <section class="view active" data-view="off" id="view-off">
-                    <p class="glow-text">click screen, or press ENTER,<br>to turn on</p>
-                </section>
+                <section class="view active" data-view="off" id="view-off"></section>
 
                 <section class="view" data-view="pin" id="view-pin">
                     <p class="glow-text small">enter code</p>
@@ -574,7 +572,20 @@
     // --- auto-play: after the correct PIN, tour every year/item on its own ---
     function startAutoPlay() {
         autoPlaying = true;
-        autoAdvanceYear(0);
+        const startIdx = YEAR_LIST.indexOf("2014");
+        introScanStep(startIdx >= 0 ? startIdx : 0);
+    }
+
+    // Cursor starts on 2014 and steps backward to 2012 before the tour opens it.
+    function introScanStep(idx) {
+        menuSelected = idx;
+        renderMenu();
+        setState("menu");
+        if (idx <= 0) {
+            autoTimer = setTimeout(() => autoAdvanceYear(0), AUTOPLAY_STEP_DELAY);
+        } else {
+            autoTimer = setTimeout(() => introScanStep(idx - 1), AUTOPLAY_STEP_DELAY);
+        }
     }
 
     function autoAdvanceYear(yearIdx) {
