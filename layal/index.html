@@ -337,8 +337,19 @@
 
     const YEARS = {
         2012: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
+        2013: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
+        2014: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
+        2015: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
+        2016: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
         2017: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
+        2018: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
+        2019: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
+        2020: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
+        2021: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
         2022: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
+        2023: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
+        2024: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
+        2025: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
         2026: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
     };
     const YEAR_LIST = Object.keys(YEARS);
@@ -353,12 +364,18 @@
     const pinDisplay = document.getElementById("pinDisplay");
     const keypad = document.getElementById("keypad");
 
+    const AUTOPLAY_STEP_DELAY = 900; // pause on a menu/scene selection before "pressing enter"
+    const PHOTO_DWELL = 3500; // ms each photo stays on screen
+    const VIDEO_MAX_DWELL = 20000; // safety fallback if a video never fires ended/error
+
     let state = "off";
     let menuSelected = 0;
     let sceneSelected = 0;
     let currentYear = null;
     let currentItems = [];
     let pinEntered = "";
+    let autoPlaying = false;
+    let autoTimer = null;
 
     function setState(next) {
         state = next;
@@ -387,9 +404,7 @@
         crtHum.play().catch(() => {}); // ponytail: silent no-op until audio files are dropped in
         doFlicker(() => {
             if (localStorage.getItem("layalUnlocked") === "1") {
-                menuSelected = 0;
-                renderMenu();
-                setState("menu");
+                startAutoPlay();
             } else {
                 setState("pin");
             }
@@ -420,7 +435,7 @@
     function checkPin() {
         if (pinEntered === PIN) {
             localStorage.setItem("layalUnlocked", "1");
-            doFlicker(() => { menuSelected = 0; renderMenu(); setState("menu"); });
+            doFlicker(() => { startAutoPlay(); });
         } else {
             pinDisplay.classList.add("error");
             setTimeout(() => { pinEntered = ""; renderPin(); }, 500);
@@ -477,6 +492,7 @@
             const data = YEARS[year];
             const count = data.photos.length + data.videos.length;
             const gridItem = buildGridItem(label, ["Special Features", count + " items"], idx === menuSelected, () => {
+                if (autoPlaying) return;
                 menuSelected = idx;
                 openYear(year);
             });
@@ -485,8 +501,8 @@
         document.getElementById("menuPrev").classList.toggle("disabled", page === 0);
         document.getElementById("menuNext").classList.toggle("disabled", page >= totalPages - 1);
     }
-    document.getElementById("menuPrev").addEventListener("click", () => movePage("menu", -1));
-    document.getElementById("menuNext").addEventListener("click", () => movePage("menu", 1));
+    document.getElementById("menuPrev").addEventListener("click", () => { if (!autoPlaying) movePage("menu", -1); });
+    document.getElementById("menuNext").addEventListener("click", () => { if (!autoPlaying) movePage("menu", 1); });
 
     function openYear(year) {
         currentYear = year;
@@ -522,6 +538,7 @@
             }
             const meta = [item.type === "photo" ? "PHOTO" : "VIDEO", item.file];
             const gridItem = buildGridItem(thumbNode, meta, idx === sceneSelected, () => {
+                if (autoPlaying) return;
                 sceneSelected = idx;
                 openViewer(item);
             });
@@ -530,9 +547,9 @@
         document.getElementById("scenePrev").classList.toggle("disabled", page === 0);
         document.getElementById("sceneNext").classList.toggle("disabled", page >= totalPages - 1);
     }
-    document.getElementById("scenePrev").addEventListener("click", () => movePage("scene", -1));
-    document.getElementById("sceneNext").addEventListener("click", () => movePage("scene", 1));
-    document.getElementById("sceneTop").addEventListener("click", () => setState("menu"));
+    document.getElementById("scenePrev").addEventListener("click", () => { if (!autoPlaying) movePage("scene", -1); });
+    document.getElementById("sceneNext").addEventListener("click", () => { if (!autoPlaying) movePage("scene", 1); });
+    document.getElementById("sceneTop").addEventListener("click", () => { if (!autoPlaying) setState("menu"); });
 
     function openViewer(item) {
         viewerStage.innerHTML = "";
@@ -554,8 +571,60 @@
         setState("viewer");
     }
 
+    // --- auto-play: after the correct PIN, tour every year/item on its own ---
+    function startAutoPlay() {
+        autoPlaying = true;
+        autoAdvanceYear(0);
+    }
+
+    function autoAdvanceYear(yearIdx) {
+        yearIdx = yearIdx % YEAR_LIST.length; // loop forever
+        menuSelected = yearIdx;
+        renderMenu();
+        setState("menu");
+        autoTimer = setTimeout(() => {
+            openYear(YEAR_LIST[yearIdx]);
+            autoAdvanceItem(0, yearIdx);
+        }, AUTOPLAY_STEP_DELAY);
+    }
+
+    function autoAdvanceItem(itemIdx, yearIdx) {
+        if (itemIdx >= currentItems.length) {
+            menuSelected = yearIdx;
+            renderMenu();
+            setState("menu");
+            autoTimer = setTimeout(() => autoAdvanceYear(yearIdx + 1), AUTOPLAY_STEP_DELAY);
+            return;
+        }
+        sceneSelected = itemIdx;
+        renderScene();
+        setState("scene");
+        autoTimer = setTimeout(() => {
+            const item = currentItems[itemIdx];
+            openViewer(item);
+            autoAdvanceFromViewer(item, itemIdx, yearIdx);
+        }, AUTOPLAY_STEP_DELAY);
+    }
+
+    function autoAdvanceFromViewer(item, itemIdx, yearIdx) {
+        const goNext = () => autoAdvanceItem(itemIdx + 1, yearIdx);
+        if (item.type === "video") {
+            const video = viewerStage.querySelector("video");
+            let done = false;
+            const onceNext = () => { if (done) return; done = true; goNext(); };
+            if (video) {
+                video.addEventListener("ended", onceNext, { once: true });
+                video.addEventListener("error", onceNext, { once: true });
+            }
+            autoTimer = setTimeout(onceNext, VIDEO_MAX_DWELL);
+        } else {
+            autoTimer = setTimeout(goNext, PHOTO_DWELL);
+        }
+    }
+
     // --- keyboard navigation ---
     document.addEventListener("keydown", (e) => {
+        if (autoPlaying) return;
         if (state === "off") {
             if (e.key === "Enter") powerOn();
             return;
