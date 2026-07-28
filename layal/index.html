@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Layal</title>
+<link rel="preload" href="../fonts/JetBrainsMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+    @font-face {
+        font-family: "JetBrains Mono";
+        src: url("../fonts/JetBrainsMono-Regular.woff2") format("woff2");
+        font-weight: 400;
+        font-style: normal;
+        font-display: swap;
+    }
+
+    :root {
+        --amber: #ffb347;
+        --amber-dim: #a86c1e;
+        --wood-1: #5a3a22;
+        --wood-2: #3e2716;
+        --screen-black: #0a0503;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(ellipse at center, #241a14 0%, #100b08 100%);
+        font-family: "JetBrains Mono", monospace;
+        padding: 2rem;
+    }
+
+    .tv {
+        width: min(92vw, 720px);
+        background:
+            repeating-linear-gradient(100deg, var(--wood-1) 0 6px, var(--wood-2) 6px 12px);
+        border-radius: 18px;
+        padding: 2.2rem 2.2rem 2.6rem;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.6), inset 0 0 0 2px rgba(0,0,0,0.3);
+        position: relative;
+    }
+
+    .tv-controls {
+        position: absolute;
+        top: 1.6rem;
+        right: 1.8rem;
+        display: flex;
+        gap: 0.7rem;
+    }
+
+    .knob {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 30%, #d8d0c8, #6b6459 70%);
+        box-shadow: 0 2px 3px rgba(0,0,0,0.5);
+    }
+
+    .screen-bezel {
+        background: #1b1310;
+        border-radius: 10px;
+        padding: 1.4rem;
+        box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+    }
+
+    .screen {
+        position: relative;
+        aspect-ratio: 4 / 3;
+        background: var(--screen-black);
+        border-radius: 6px;
+        overflow: hidden;
+        color: var(--amber);
+    }
+
+    .screen::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+            to bottom,
+            rgba(0,0,0,0) 0px, rgba(0,0,0,0) 1px,
+            rgba(0,0,0,0.25) 2px, rgba(0,0,0,0.25) 3px
+        );
+        mix-blend-mode: multiply;
+    }
+
+    .screen::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 6;
+        pointer-events: none;
+        background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.55) 100%);
+    }
+
+    .flicker {
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+        background: repeating-linear-gradient(0deg, #fff 0 2px, #888 2px 4px, #222 4px 6px);
+        opacity: 0;
+        pointer-events: none;
+    }
+    .flicker.on {
+        animation: static-flicker 0.5s steps(6, end);
+    }
+    @keyframes static-flicker {
+        0%   { opacity: 0.95; }
+        16%  { opacity: 0.2; }
+        33%  { opacity: 0.9; }
+        50%  { opacity: 0.1; }
+        66%  { opacity: 0.85; }
+        83%  { opacity: 0.15; }
+        100% { opacity: 0; }
+    }
+
+    .view {
+        position: absolute;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        padding: 1.4rem;
+        text-align: center;
+    }
+    .view.active { display: flex; }
+
+    .glow-text {
+        text-shadow: 0 0 8px rgba(255, 179, 71, 0.7);
+        font-size: 1.05rem;
+        cursor: pointer;
+    }
+    .glow-text.small { font-size: 0.85rem; opacity: 0.8; }
+
+    .pin-display {
+        font-size: 1.8rem;
+        letter-spacing: 0.5rem;
+        text-shadow: 0 0 8px rgba(255, 179, 71, 0.8);
+    }
+    .pin-display.error { animation: shake 0.4s; color: #ff5f56; }
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-8px); }
+        75% { transform: translateX(8px); }
+    }
+
+    .keypad {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.6rem;
+    }
+    .keypad button {
+        font-family: inherit;
+        font-size: 1rem;
+        width: 2.6rem;
+        height: 2.6rem;
+        border-radius: 50%;
+        border: 1px solid var(--amber-dim);
+        background: rgba(255, 179, 71, 0.08);
+        color: var(--amber);
+        cursor: pointer;
+    }
+    .keypad button:hover, .keypad button:focus {
+        background: rgba(255, 179, 71, 0.25);
+        outline: none;
+    }
+
+    .menu-title {
+        font-size: 1.1rem;
+        text-shadow: 0 0 8px rgba(255, 179, 71, 0.6);
+    }
+
+    .disc-list {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        width: 100%;
+        max-width: 260px;
+    }
+    .disc-list li {
+        border: 1px solid var(--amber-dim);
+        border-radius: 6px;
+        padding: 0.6rem 1rem;
+        cursor: pointer;
+        transition: background 0.15s, text-shadow 0.15s;
+    }
+    .disc-list li.selected {
+        background: rgba(255, 179, 71, 0.18);
+        text-shadow: 0 0 10px rgba(255, 179, 71, 0.9);
+    }
+
+    .thumb-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.6rem;
+        width: 100%;
+        max-height: 65%;
+        overflow-y: auto;
+    }
+    .thumb {
+        aspect-ratio: 1;
+        border: 1px solid var(--amber-dim);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        text-align: center;
+        padding: 0.3rem;
+        cursor: pointer;
+        overflow: hidden;
+        position: relative;
+    }
+    .thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .thumb.selected { box-shadow: 0 0 0 2px var(--amber); }
+    .thumb .kind-tag {
+        position: absolute;
+        top: 2px;
+        left: 4px;
+        font-size: 0.6rem;
+        opacity: 0.7;
+    }
+
+    .placeholder-box {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        font-size: 0.65rem;
+        opacity: 0.6;
+        padding: 0.3rem;
+        word-break: break-word;
+    }
+
+    .viewer-stage {
+        width: 100%;
+        height: 80%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .viewer-stage img, .viewer-stage video {
+        max-width: 100%;
+        max-height: 100%;
+    }
+
+    .hint {
+        font-size: 0.7rem;
+        opacity: 0.55;
+    }
+</style>
+</head>
+<body>
+    <div class="tv">
+        <div class="tv-controls"><div class="knob"></div><div class="knob"></div></div>
+        <div class="screen-bezel">
+            <div class="screen" id="screen">
+                <div class="flicker" id="flicker"></div>
+
+                <section class="view active" data-view="off" id="view-off">
+                    <p class="glow-text">click screen, or press ENTER,<br>to turn on</p>
+                </section>
+
+                <section class="view" data-view="pin" id="view-pin">
+                    <p class="glow-text small">enter code</p>
+                    <div class="pin-display" id="pinDisplay">&#9679;&#9679;&#9679;&#9679;</div>
+                    <div class="keypad" id="keypad"></div>
+                </section>
+
+                <section class="view" data-view="menu" id="view-menu">
+                    <h2 class="menu-title">Layal &mdash; Special Features</h2>
+                    <ul class="disc-list" id="discList"></ul>
+                    <p class="hint">&uarr;&darr; + Enter, or click</p>
+                </section>
+
+                <section class="view" data-view="scene" id="view-scene">
+                    <h2 class="menu-title" id="sceneTitle"></h2>
+                    <div class="thumb-grid" id="thumbGrid"></div>
+                    <p class="hint">Enter to play &middot; Esc to go back</p>
+                </section>
+
+                <section class="view" data-view="viewer" id="view-viewer">
+                    <div class="viewer-stage" id="viewerStage"></div>
+                    <p class="hint">Esc to go back</p>
+                </section>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // ponytail: 4-digit PIN is obscurity only, not real auth. Fine for a family gift link.
+    const PIN = "2012";
+
+    const YEARS = {
+        2012: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
+        2017: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
+        2022: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
+        2026: { photos: ["1.jpg", "2.jpg", "3.jpg"], videos: ["1.mp4"] },
+    };
+    const YEAR_LIST = Object.keys(YEARS);
+
+    const views = document.querySelectorAll(".view");
+    const flicker = document.getElementById("flicker");
+    const discList = document.getElementById("discList");
+    const thumbGrid = document.getElementById("thumbGrid");
+    const sceneTitle = document.getElementById("sceneTitle");
+    const viewerStage = document.getElementById("viewerStage");
+    const pinDisplay = document.getElementById("pinDisplay");
+    const keypad = document.getElementById("keypad");
+
+    let state = "off";
+    let menuIndex = 0;
+    let thumbIndex = 0;
+    let currentYear = null;
+    let currentItems = [];
+    let pinEntered = "";
+
+    function setState(next) {
+        state = next;
+        views.forEach(v => v.classList.toggle("active", v.dataset.view === next));
+    }
+
+    function doFlicker(then) {
+        flicker.classList.remove("on");
+        void flicker.offsetWidth; // restart animation
+        flicker.classList.add("on");
+        setTimeout(() => { flicker.classList.remove("on"); if (then) then(); }, 500);
+    }
+
+    function placeholder(path) {
+        const div = document.createElement("div");
+        div.className = "placeholder-box";
+        div.textContent = "drop file here: " + path;
+        return div;
+    }
+
+    // --- power on ---
+    function powerOn() {
+        if (state !== "off") return;
+        doFlicker(() => {
+            if (localStorage.getItem("layalUnlocked") === "1") {
+                renderMenu();
+                setState("menu");
+            } else {
+                setState("pin");
+            }
+        });
+    }
+    document.getElementById("view-off").addEventListener("click", powerOn);
+
+    // --- pin keypad ---
+    for (let d = 0; d <= 9; d++) {
+        const btn = document.createElement("button");
+        btn.textContent = d;
+        btn.addEventListener("click", () => enterDigit(String(d)));
+        keypad.appendChild(btn);
+    }
+
+    function enterDigit(digit) {
+        if (pinEntered.length >= 4) return;
+        pinEntered += digit;
+        renderPin();
+        if (pinEntered.length === 4) checkPin();
+    }
+
+    function renderPin() {
+        pinDisplay.textContent = "●".repeat(pinEntered.length) + "○".repeat(4 - pinEntered.length);
+        pinDisplay.classList.remove("error");
+    }
+
+    function checkPin() {
+        if (pinEntered === PIN) {
+            localStorage.setItem("layalUnlocked", "1");
+            doFlicker(() => { renderMenu(); setState("menu"); });
+        } else {
+            pinDisplay.classList.add("error");
+            setTimeout(() => { pinEntered = ""; renderPin(); }, 500);
+        }
+    }
+
+    // --- root menu ---
+    function renderMenu() {
+        discList.innerHTML = "";
+        YEAR_LIST.forEach((year, i) => {
+            const li = document.createElement("li");
+            li.textContent = year;
+            li.dataset.year = year;
+            li.addEventListener("click", () => { menuIndex = i; openYear(year); });
+            discList.appendChild(li);
+        });
+        menuIndex = 0;
+        highlightMenu();
+    }
+
+    function highlightMenu() {
+        [...discList.children].forEach((li, i) => li.classList.toggle("selected", i === menuIndex));
+    }
+
+    function openYear(year) {
+        currentYear = year;
+        const data = YEARS[year];
+        currentItems = [
+            ...data.photos.map(f => ({ type: "photo", file: f })),
+            ...data.videos.map(f => ({ type: "video", file: f })),
+        ];
+        sceneTitle.textContent = year + " — Scene Selection";
+        thumbGrid.innerHTML = "";
+        currentItems.forEach((item, i) => {
+            const div = document.createElement("div");
+            div.className = "thumb";
+            const tag = document.createElement("span");
+            tag.className = "kind-tag";
+            tag.textContent = item.type === "photo" ? "\u{1F5BC}" : "▶";
+            div.appendChild(tag);
+            const path = "media/" + year + "/" + item.file;
+            if (item.type === "photo") {
+                const img = document.createElement("img");
+                img.src = path;
+                img.alt = "";
+                img.onerror = () => { img.replaceWith(placeholder(path)); };
+                div.appendChild(img);
+            } else {
+                div.appendChild(placeholder(path));
+            }
+            div.addEventListener("click", () => { thumbIndex = i; openViewer(item); });
+            thumbGrid.appendChild(div);
+        });
+        thumbIndex = 0;
+        highlightThumb();
+        setState("scene");
+    }
+
+    function highlightThumb() {
+        [...thumbGrid.children].forEach((el, i) => el.classList.toggle("selected", i === thumbIndex));
+    }
+
+    function openViewer(item) {
+        viewerStage.innerHTML = "";
+        const path = "media/" + currentYear + "/" + item.file;
+        if (item.type === "photo") {
+            const img = document.createElement("img");
+            img.src = path;
+            img.alt = "";
+            img.onerror = () => { img.replaceWith(placeholder(path)); };
+            viewerStage.appendChild(img);
+        } else {
+            const video = document.createElement("video");
+            video.src = path;
+            video.controls = true;
+            video.autoplay = true;
+            video.onerror = () => { video.replaceWith(placeholder(path)); };
+            viewerStage.appendChild(video);
+        }
+        setState("viewer");
+    }
+
+    // --- keyboard navigation ---
+    document.addEventListener("keydown", (e) => {
+        if (state === "off") {
+            if (e.key === "Enter") powerOn();
+            return;
+        }
+        if (state === "pin") {
+            if (/^[0-9]$/.test(e.key)) enterDigit(e.key);
+            else if (e.key === "Backspace") { pinEntered = pinEntered.slice(0, -1); renderPin(); }
+            return;
+        }
+        if (state === "menu") {
+            if (e.key === "ArrowDown") { menuIndex = (menuIndex + 1) % YEAR_LIST.length; highlightMenu(); }
+            else if (e.key === "ArrowUp") { menuIndex = (menuIndex - 1 + YEAR_LIST.length) % YEAR_LIST.length; highlightMenu(); }
+            else if (e.key === "Enter") openYear(YEAR_LIST[menuIndex]);
+            return;
+        }
+        if (state === "scene") {
+            const cols = 3;
+            if (e.key === "ArrowRight") { thumbIndex = (thumbIndex + 1) % currentItems.length; highlightThumb(); }
+            else if (e.key === "ArrowLeft") { thumbIndex = (thumbIndex - 1 + currentItems.length) % currentItems.length; highlightThumb(); }
+            else if (e.key === "ArrowDown") { thumbIndex = (thumbIndex + cols) % currentItems.length; highlightThumb(); }
+            else if (e.key === "ArrowUp") { thumbIndex = (thumbIndex - cols + currentItems.length) % currentItems.length; highlightThumb(); }
+            else if (e.key === "Enter") openViewer(currentItems[thumbIndex]);
+            else if (e.key === "Escape") setState("menu");
+            return;
+        }
+        if (state === "viewer") {
+            if (e.key === "Escape") setState("scene");
+            return;
+        }
+    });
+</script>
+</body>
+</html>
